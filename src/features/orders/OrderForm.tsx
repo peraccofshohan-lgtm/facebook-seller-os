@@ -15,6 +15,7 @@ import { formatMoney } from '@/lib/money';
 import { nowMs, startOfDay, toDateInputValue, fromDateInputValue } from '@/lib/date';
 import { randomId } from '@/lib/id';
 import type { Order } from '@/domain/types';
+import { PromotionPanel } from '@/features/promotions/PromotionPanel';
 import { ProductPicker, type PickedProduct } from './ProductPicker';
 import { CustomerPicker } from './CustomerPicker';
 
@@ -84,6 +85,9 @@ export function OrderForm({ mode, initial, onSaved }: OrderFormProps) {
   const [customerInstructions, setCustomerInstructions] = useState(initial?.customerInstructions ?? '');
   const [advancePayment, setAdvancePayment] = useState(0);
   const [manualName, setManualName] = useState('');
+  // V2: promotions. Kept on the form so the preview and the saved order agree.
+  const [couponCode, setCouponCode] = useState(initial?.couponCode ?? '');
+  const [pointsToRedeem, setPointsToRedeem] = useState(0);
   const [productQuery, setProductQuery] = useState('');
 
   useEffect(() => {
@@ -209,6 +213,8 @@ export function OrderForm({ mode, initial, onSaved }: OrderFormProps) {
       cancelReason: '',
       advancePayment,
       advanceMethod: paymentMethod,
+      couponCode,
+      pointsToRedeem,
     };
 
     setSaving(true);
@@ -407,6 +413,28 @@ export function OrderForm({ mode, initial, onSaved }: OrderFormProps) {
             </div>
           </CardBody>
         </Card>
+
+        <PromotionPanel
+          lines={items.map((item) => ({
+            productId: item.productId,
+            variantId: item.variantId,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            unitCost: item.unitCost,
+            lineDiscount: item.discount,
+            name: item.name,
+            unit: item.unit,
+          }))}
+          deliveryCharge={deliveryCharge}
+          otherCharge={otherCharge}
+          customerId={customerId}
+          couponCode={couponCode}
+          pointsToRedeem={pointsToRedeem}
+          enabled={settings?.promotions?.enabled ?? false}
+          loyaltyEnabled={settings?.promotions?.loyaltyEnabled ?? false}
+          onCouponChange={setCouponCode}
+          onPointsChange={setPointsToRedeem}
+        />
 
         <Card>
           <CardHeader title="পেমেন্ট ও ডেলিভারি" />

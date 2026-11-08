@@ -196,6 +196,10 @@ export const orderInputSchema = z.object({
   /** Advance/initial payment captured while creating the order. */
   advancePayment: nonNegativeMoney.optional().default(0),
   advanceMethod: z.string().trim().max(40).optional().default('cash'),
+  /** V2: coupon code typed by the customer. */
+  couponCode: z.string().trim().max(40).optional().default(''),
+  /** V2: loyalty points the customer is spending on this order. */
+  pointsToRedeem: z.coerce.number().int().min(0).max(1_000_000).optional().default(0),
 });
 
 export type OrderInput = z.infer<typeof orderInputSchema>;
@@ -320,3 +324,170 @@ export function zodErrorMap(error: z.ZodError): Record<string, string> {
   }
   return out;
 }
+
+/* ------------------------------------------------------------------ */
+/* V2: Promotions                                                      */
+/* ------------------------------------------------------------------ */
+
+const PROMOTION_TYPES = [
+  'percent', 'fixed', 'bogo', 'buy_x_get_y', 'free_gift', 'free_delivery', 'bundle',
+  'coupon', 'min_purchase', 'first_order', 'repeat_customer', 'seasonal',
+  'limited_time', 'product_specific', 'category_specific', 'loyalty_points', 'referral',
+] as const;
+
+const PROMOTION_MECHANISMS = [
+  'percent_off', 'amount_off', 'free_items', 'bundle_price', 'free_delivery',
+  'loyalty_points', 'referral_reward',
+] as const;
+
+const idList = z.array(z.string().trim().min(1).max(64)).max(500).optional().default([]);
+
+export const promotionInputSchema = z
+  .object({
+    name: z.string().trim().min(1, 'অফারের নাম দিন').max(200, 'নাম খুব বড়'),
+    description: z.string().trim().max(2000).optional().default(''),
+    type: z.enum(PROMOTION_TYPES),
+    mechanism: z.enum(PROMOTION_MECHANISMS).optional(),
+    status: z.enum(['draft', 'active', 'paused']).optional().default('active'),
+
+    percentOff: z.coerce.number().min(0, 'শতাংশ ঋণাত্মক হতে পারবে না').max(100, 'শতাংশ ১০০ এর বেশি হতে পারবে না').optional().default(0),
+    amountOff: nonNegativeMoney.optional().default(0),
+    buyQuantity: z.coerce.number().int().min(0).max(1000).optional().default(0),
+    getQuantity: z.coerce.number().int().min(0).max(1000).optional().default(0),
+    bundleItems: z
+      .array(
+        z.object({
+          productId: z.string().nullable().optional().default(null),
+          variantId: z.string().nullable().optional().default(null),
+          name: z.string().trim().min(1, 'পণ্যের নাম দিন').max(200),
+          quantity: z.coerce.number().int().min(1).max(1000),
+        }),
+      )
+      .max(50)
+      .optional()
+      .default([]),
+    bundlePrice: nonNegativeMoney.optional().default(0),
+    giftItems: z
+      .array(
+        z.object({
+          productId: z.string().nullable().optional().default(null),
+          variantId: z.string().nullable().optional().default(null),
+          name: z.string().trim().min(1, 'উপহারের নাম দিন').max(200),
+          quantity: z.coerce.number().int().min(1).max(1000),
+        }),
+      )
+      .max(50)
+      .optional()
+      .default([]),
+
+    startsAt: dateField,
+    endsAt: z.union([dateField, z.null()]).optional().default(null),
+    productIds: idList,
+    categoryIds: idList,
+    minOrderAmount: nonNegativeMoney.optional().default(0),
+    maxDiscount: nonNegativeMoney.optional().default(0),
+    usageLimit: z.union([z.coerce.number().int().min(1).max(1_000_000), z.null()]).optional().default(null),
+    perCustomerLimit: z.union([z.coerce.number().int().min(1).max(1_000_000), z.null()]).optional().default(null),
+    customerEligibility: z.enum(['all', 'first_order', 'repeat']).optional().default('all'),
+    customerSegments: z.array(z.string().trim().min(1).max(40)).max(30).optional().default([]),
+    couponCode: z.string().trim().max(40).optional().default(''),
+
+    stackable: z.boolean().optional().default(true),
+    priority: z.coerce.number().int().min(0).max(999).optional().default(10),
+    combinationGroup: z.string().trim().max(40).optional().default(''),
+    terms: z.string().trim().max(2000).optional().default(''),
+  })
+  .superRefine((value, ctx) => {
+    // A window that ends before it starts is always a typing mistake.
+    if (value.endsAt != null && value.endsAt < value.startsAt) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['endsAt'], message: 'শেষ তারিখ শুরুর আগে হতে পারবে না' });
+    }
+    if (value.mechanism === 'percent_off' && value.percentOff <= 0 && value.type !== 'referral') {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['percentOff'], message: 'শতাংশ ছাড় ০ এর বেশি দিন' });
+    }
+    if (value.mechanism === 'amount_off' && value.amountOff <= 0) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['amountOff'], message: 'ছাড়ের টাকার অঙ্ক ০ এর বেশি দিন' });
+    }
+    if (value.mechanism === 'bundle_price' && value.bundleItems.length === 0) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['bundleItems'], message: 'বান্ডেলে অন্তত একটি পণ্য দিন' });
+    }
+    if (value.type === 'free_gift' && value.giftItems.length === 0) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['giftItems'], message: 'উপহারের পণ্য নির্বাচন করুন' });
+    }
+    if ((value.type === 'bogo' || value.type === 'buy_x_get_y') && value.getQuantity <= 0) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['getQuantity'], message: 'কতটি ফ্রি দেবেন তা দিন' });
+    }
+  });
+
+export type PromotionInput = z.infer<typeof promotionInputSchema>;
+
+/* ------------------------------------------------------------------ */
+/* V2: Note templates                                                  */
+/* ------------------------------------------------------------------ */
+
+export const noteTemplateInputSchema = z.object({
+  kind: z.enum(['courier_slip', 'parcel_label', 'invoice', 'general']),
+  name: z.string().trim().min(1, 'নোটের নাম দিন').max(120),
+  body: z.string().trim().max(1000).optional().default(''),
+  footer: z.string().trim().max(500).optional().default(''),
+  align: z.enum(['left', 'center', 'right']).optional().default('left'),
+  fontScale: z.enum(['small', 'normal', 'large']).optional().default('normal'),
+  isActive: z.boolean().optional().default(true),
+  isDefault: z.boolean().optional().default(false),
+});
+
+export type NoteTemplateInput = z.infer<typeof noteTemplateInputSchema>;
+
+/* ------------------------------------------------------------------ */
+/* V2: Recurring expenses & reminders                                  */
+/* ------------------------------------------------------------------ */
+
+export const recurringExpenseInputSchema = z
+  .object({
+    name: z.string().trim().min(1, 'খরচের নাম দিন').max(200),
+    categoryId: z.string().nullable().optional().default(null),
+    amount: nonNegativeMoney.pipe(z.number().positive('খরচের পরিমাণ ০ এর বেশি হতে হবে')),
+    method: z.string().trim().max(40).optional().default('cash'),
+    payee: z.string().trim().max(200).optional().default(''),
+    description: z.string().trim().max(500).optional().default(''),
+    note: z.string().trim().max(1000).optional().default(''),
+    frequency: z.enum(['daily', 'weekly', 'monthly', 'yearly']),
+    startDate: dateField,
+    endDate: z.union([dateField, z.null()]).optional().default(null),
+    isActive: z.boolean().optional().default(true),
+  })
+  .superRefine((value, ctx) => {
+    if (value.endDate != null && value.endDate < value.startDate) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['endDate'], message: 'শেষ তারিখ শুরুর আগে হতে পারবে না' });
+    }
+  });
+
+export type RecurringExpenseInput = z.infer<typeof recurringExpenseInputSchema>;
+
+export const reminderInputSchema = z.object({
+  title: z.string().trim().min(1, 'কী মনে করিয়ে দেবে লিখুন').max(200),
+  note: z.string().trim().max(1000).optional().default(''),
+  dueAt: dateField,
+  priority: z.enum(['low', 'normal', 'high']).optional().default('normal'),
+  referenceType: z.enum(['order', 'customer', 'courier', 'expense', 'general']).optional().default('general'),
+  referenceId: z.string().nullable().optional().default(null),
+});
+
+export type ReminderInput = z.infer<typeof reminderInputSchema>;
+
+/* ------------------------------------------------------------------ */
+/* V2: Referrals                                                       */
+/* ------------------------------------------------------------------ */
+
+export const referralInputSchema = z.object({
+  referrerCustomerId: z.string().min(1, 'কে রেফার করলেন নির্বাচন করুন'),
+  referredCustomerId: z.string().nullable().optional().default(null),
+  referredName: z.string().trim().max(200).optional().default(''),
+  rewardType: z.enum(['points', 'discount', 'cash']).optional().default('points'),
+  rewardPoints: z.coerce.number().int().min(0).max(1_000_000).optional().default(0),
+  rewardAmount: nonNegativeMoney.optional().default(0),
+  note: z.string().trim().max(1000).optional().default(''),
+  date: dateField,
+});
+
+export type ReferralInput = z.infer<typeof referralInputSchema>;

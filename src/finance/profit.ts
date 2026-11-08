@@ -15,7 +15,7 @@
  */
 
 import { addMoney, subMoney, sumMoney, type Minor } from '@/lib/money';
-import type { CourierRecord, Expense, Order } from '@/domain/types';
+import type { CourierRecord, Expense, Order, OrderItem } from '@/domain/types';
 
 export interface OrderProfit {
   /** Σ line totals after item discounts. */
@@ -42,13 +42,22 @@ export interface OrderProfit {
 }
 
 export function orderProfit(
-  order: Pick<Order, 'subtotal' | 'discount' | 'cogs' | 'deliveryCharge' | 'otherCharge' | 'total' | 'status' | 'paymentStatus'>,
+  order: Pick<
+    Order,
+    'subtotal' | 'discount' | 'cogs' | 'deliveryCharge' | 'otherCharge' | 'total' | 'status' | 'paymentStatus'
+  > & { items?: OrderItem[] },
   options: { refunds?: Minor; courierCost?: Minor; paidIn?: Minor } = {},
 ): OrderProfit {
   const refunds = options.refunds ?? 0;
   const courierCost = options.courierCost ?? 0;
-  const grossSales = order.subtotal ?? 0;
-  const discounts = order.discount ?? 0;
+
+  // `subtotal` is already net of per-line discounts, so add them back to recover the
+  // gross. V2 writes promotion discounts onto the LINES, and without this the report
+  // would show a discounted revenue figure with "discounts: 0" beside it — hiding the
+  // money the seller actually gave away.
+  const lineDiscounts = order.items ? sumMoney(order.items.map((item) => item.discount ?? 0)) : 0;
+  const grossSales = addMoney(order.subtotal ?? 0, lineDiscounts);
+  const discounts = addMoney(order.discount ?? 0, lineDiscounts);
   const netSales = subMoney(grossSales, discounts);
   const cogs = order.cogs ?? 0;
   const grossProfit = subMoney(netSales, cogs);

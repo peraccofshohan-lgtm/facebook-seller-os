@@ -24,6 +24,7 @@ import { addOrderEventInternal, totalsForOrder } from './paymentService';
 import type { ID, Order, OrderEvent, OrderItem, OrderStatusKey } from '@/domain/types';
 import type { OrderInput, OrderItemInput } from '@/domain/schemas';
 import { newOrderFields, newOrderItemFields } from '@/domain/newRecord';
+import { applyEvaluationToItems, evaluateForBasket, recordUsage, releaseUsage } from './promotionService';
 
 export interface OrderQuery {
   query?: string;
@@ -159,7 +160,13 @@ export async function createOrder(input: OrderInput): Promise<Order> {
   const settings = await getSettings();
   return db.transaction(
     'rw',
-    [db.orders, db.orderEvents, db.payments, db.settings, db.stockLevels, db.stockMovements, db.customers, db.products, db.productVariants],
+    [
+      db.orders, db.orderEvents, db.payments, db.settings, db.stockLevels, db.stockMovements,
+      db.customers, db.products, db.productVariants,
+      // V2: promotions are evaluated and their usage recorded in the same transaction,
+      // so an order can never exist without — or with the wrong — discount record.
+      db.promotions, db.promotionUsages, db.loyaltyEntries,
+    ],
     async () => {
       const now = nowMs();
       const numbering = await db.settings.get('app');
@@ -174,7 +181,52 @@ export async function createOrder(input: OrderInput): Promise<Order> {
         updatedAt: now,
       });
 
-      const items = buildItems(input.items);
+      let items = buildItems(input.items);
+      let deliveryChargeAfterPromotions = input.deliveryCharge ?? 0;
+      let promotionFields = newOrderFields();
+      let promotionOrderDiscount = 0;
+
+      // V2: run the promotion engine BEFORE the totals are computed, so subtotal,
+      // discount, delivery charge and total all reflect the real price the customer pays.
+      let promotionEvaluation = null;
+      if (numbering?.promotions?.enabled ?? settings.promotions.enabled) {
+        promotionEvaluation = await evaluateForBasket({
+          lines: items.map((item) => ({
+            productId: item.productId,
+            variantId: item.variantId,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            unitCost: item.unitCost,
+            lineDiscount: item.discount,
+            name: item.name,
+            unit: item.unit,
+          })),
+          deliveryCharge: input.deliveryCharge ?? 0,
+          otherCharge: input.otherCharge ?? 0,
+          customerId: input.customerId ?? null,
+          couponCode: input.couponCode ?? '',
+          pointsToRedeem: input.pointsToRedeem ?? 0,
+        });
+        const applied = applyEvaluationToItems(
+          items,
+          input.deliveryCharge ?? 0,
+          promotionEvaluation,
+          input.couponCode ?? '',
+        );
+        items = applied.items;
+        deliveryChargeAfterPromotions = applied.deliveryCharge;
+        promotionOrderDiscount = applied.orderDiscount;
+        promotionFields = {
+          promotionIds: applied.promotionIds,
+          promotionDiscount: applied.promotionDiscount,
+          couponCode: applied.couponCode,
+          loyaltyPointsEarned: applied.loyaltyPointsEarned,
+          loyaltyPointsRedeemed: applied.loyaltyPointsRedeemed,
+          loyaltyDiscount: applied.loyaltyDiscount,
+          referralId: null,
+        };
+      }
+
       const draft: Order = {
         id: randomId(),
         orderNumber,
@@ -186,8 +238,10 @@ export async function createOrder(input: OrderInput): Promise<Order> {
         deliveryAddress: input.deliveryAddress ?? '',
         items,
         subtotal: 0,
-        discount: input.discount ?? 0,
-        deliveryCharge: input.deliveryCharge ?? 0,
+        // Manual discount from the form plus anything the promotions took off at
+        // order level. Line-scoped discounts are already inside the lines' lineTotal.
+        discount: addMoney(input.discount ?? 0, promotionOrderDiscount),
+        deliveryCharge: deliveryChargeAfterPromotions,
         otherCharge: input.otherCharge ?? 0,
         total: 0,
         cogs: 0,
@@ -200,7 +254,7 @@ export async function createOrder(input: OrderInput): Promise<Order> {
         notes: input.notes ?? '',
         customerInstructions: input.customerInstructions ?? '',
         cancelReason: input.cancelReason ?? '',
-        ...newOrderFields(),
+        ...promotionFields,
         stockCommitted: false,
         returnRestocked: false,
         codAmount: 0,
@@ -222,6 +276,25 @@ export async function createOrder(input: OrderInput): Promise<Order> {
 
       await db.orders.add(draft);
       await addOrderEventInternal(draft.id, 'created', `অর্ডার তৈরি করা হয়েছে (${draft.orderNumber})`);
+
+      // Record what was actually given away, so the promotion report measures reality
+      // instead of re-deriving a number that could drift when an offer is edited later.
+      // Points can be redeemed without any promotion being active, so the loyalty
+      // ledger must be written in that case too — otherwise the customer would keep
+      // points they have already spent.
+      if (
+        promotionEvaluation &&
+        (promotionEvaluation.applied.length > 0 || promotionEvaluation.pointsRedeemed > 0)
+      ) {
+        await recordUsage(draft, promotionEvaluation);
+        if (promotionEvaluation.applied.length > 0) {
+          await addOrderEventInternal(
+            draft.id,
+            'note',
+            `প্রযোজ্য অফার: ${promotionEvaluation.applied.map((a) => a.name).join(', ')}`,
+          );
+        }
+      }
 
       if (input.advancePayment > 0) {
         await db.payments.add({
@@ -251,6 +324,10 @@ export async function createOrder(input: OrderInput): Promise<Order> {
   );
 }
 
+interface PromotionEvaluationLike {
+  applied: Array<{ name: string }>;
+}
+
 export interface UpdateOrderInput extends Partial<OrderInput> {
   id: ID;
 }
@@ -269,6 +346,11 @@ export async function updateOrder(id: ID, patch: UpdateOrderInput): Promise<Orde
       db.products,
       db.productVariants,
       db.settings,
+      // V2: promotions are re-evaluated on edit so the recorded discount always
+      // matches the basket that was actually saved.
+      db.promotions,
+      db.promotionUsages,
+      db.loyaltyEntries,
     ],
     async () => {
       const existing = await db.orders.get(id);
@@ -316,6 +398,62 @@ export async function updateOrder(id: ID, patch: UpdateOrderInput): Promise<Orde
         next.items = nextItems;
       }
 
+      // V2: re-run promotions whenever the basket, the customer or the coupon changed.
+      // The previous usage is released first so a usage limit is not consumed twice by
+      // one order.
+      const basketChanged =
+        patch.items !== undefined ||
+        patch.customerId !== undefined ||
+        patch.deliveryCharge !== undefined ||
+        patch.couponCode !== undefined ||
+        patch.pointsToRedeem !== undefined;
+
+      if (basketChanged && (settings.promotions?.enabled ?? true)) {
+        await releaseUsage(id);
+        const evaluation = await evaluateForBasket({
+          lines: next.items
+            // Lines that are already free gifts were produced by a promotion; feeding
+            // them back in would let an offer discount a gift.
+            .filter((item) => !item.isFreeGift)
+            .map((item) => ({
+              productId: item.productId,
+              variantId: item.variantId,
+              quantity: item.quantity,
+              unitPrice: item.unitPrice,
+              unitCost: item.unitCost,
+              lineDiscount: item.discount,
+              name: item.name,
+              unit: item.unit,
+            })),
+          deliveryCharge: next.deliveryCharge,
+          otherCharge: next.otherCharge,
+          customerId: next.customerId,
+          couponCode: patch.couponCode ?? existing.couponCode ?? '',
+          pointsToRedeem: patch.pointsToRedeem ?? 0,
+        });
+        const applied = applyEvaluationToItems(
+          next.items.filter((item) => !item.isFreeGift),
+          next.deliveryCharge,
+          evaluation,
+          patch.couponCode ?? existing.couponCode ?? '',
+        );
+        next.items = applied.items;
+        next.deliveryCharge = applied.deliveryCharge;
+        next.discount = addMoney(next.discount ?? 0, evaluation.orderDiscount);
+        next.promotionIds = applied.promotionIds;
+        next.promotionDiscount = applied.promotionDiscount;
+        next.couponCode = applied.couponCode;
+        next.loyaltyPointsEarned = applied.loyaltyPointsEarned;
+        next.loyaltyPointsRedeemed = applied.loyaltyPointsRedeemed;
+        next.loyaltyDiscount = applied.loyaltyDiscount;
+
+        if (evaluation.applied.length > 0 || evaluation.pointsRedeemed > 0) {
+          // Recorded after the row is written, below, so usage points at the final total.
+          (next as Order & { __pendingPromotionEvaluation?: unknown }).__pendingPromotionEvaluation =
+            evaluation;
+        }
+      }
+
       recalcOrderFinancials(next);
 
       // Stock delta for committed orders (only the difference is moved).
@@ -333,6 +471,15 @@ export async function updateOrder(id: ID, patch: UpdateOrderInput): Promise<Orde
 
       await db.orders.put(next);
       await addOrderEventInternal(id, 'updated', 'অর্ডার হালনাগাদ করা হয়েছে');
+
+      const pending = (next as Order & { __pendingPromotionEvaluation?: PromotionEvaluationLike })
+        .__pendingPromotionEvaluation;
+      if (pending) {
+        await recordUsage(next, pending as never);
+        if (pending.applied.length > 0) {
+          await addOrderEventInternal(id, 'note', `প্রযোজ্য অফার: ${pending.applied.map((a) => a.name).join(', ')}`);
+        }
+      }
       if (patch.items) {
         await addOrderEventInternal(id, 'updated', `পণ্য তালিকা পরিবর্তন: ${next.items.length}টি আইটেম`);
       }
@@ -569,6 +716,10 @@ export async function duplicateOrder(id: ID): Promise<Order> {
     cancelReason: '',
     advancePayment: 0,
     advanceMethod: 'cash',
+    // The coupon travels with the copy; redeemed points do not, because they were
+    // spent on the original order.
+    couponCode: source.couponCode ?? '',
+    pointsToRedeem: 0,
   };
   const copy = await createOrder(input);
   await db.orders.update(copy.id, { notes: `${copy.notes}\n[${source.orderNumber} থেকে কপি]`.trim() });
