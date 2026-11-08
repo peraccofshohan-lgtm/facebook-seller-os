@@ -80,10 +80,15 @@ export function parseCsv(input: string): CsvTable {
 const RISKY_PREFIX = /^[=+\-@\t\r]/;
 
 /** Neutralise spreadsheet formula injection by prefixing a single quote. */
+/** A plain number is safe: only formulas are a spreadsheet-injection risk. */
+const PLAIN_NUMBER = /^-?\d+(\.\d+)?$/;
+
 export function sanitizeCsvCell(value: unknown): string {
   if (value === null || value === undefined) return '';
   let s = String(value);
-  if (RISKY_PREFIX.test(s)) s = `'${s}`;
+  // Guard spreadsheet formula injection, but do not mangle a real negative
+  // amount: "-500" is data, "=1+1" is a formula.
+  if (RISKY_PREFIX.test(s) && !PLAIN_NUMBER.test(s)) s = `'${s}`;
   return s;
 }
 

@@ -82,5 +82,12 @@ test.describe('first run', () => {
     await openScreen(page, ui.NAV_PRODUCTS);
     await expect(visibleText(page, '৳700')).toBeVisible();
     await expect(page.getByText('৳৭০০')).toHaveCount(0);
+
+    // …and it must survive a cold page load, not just in-app navigation.
+    // (A parent effect runs after child effects, so a first paint formatted
+    // with the module default would never be corrected.)
+    await page.goto('/products');
+    await expect(visibleText(page, '৳700')).toBeVisible();
+    await expect(page.getByText('৳৭০০')).toHaveCount(0);
   });
 });

@@ -31,6 +31,16 @@ describe('csv injection guard', () => {
     expect(sanitizeCsvCell('﻿hello')).toBe('﻿hello');
   });
 
+  it('exports real negative numbers as numbers, not as text', () => {
+    // A loss of -75 must not come out as "'-75" in the spreadsheet.
+    expect(sanitizeCsvCell(-75)).toBe('-75');
+    expect(sanitizeCsvCell('-75.50')).toBe('-75.50');
+    expect(sanitizeCsvCell('-500')).toBe('-500');
+    // …while a formula starting with a minus still gets neutralised.
+    expect(sanitizeCsvCell('-2+3')).toBe("'-2+3");
+    expect(sanitizeCsvCell('-1+A1')).toBe("'-1+A1");
+  });
+
   it('leaves ordinary text untouched', () => {
     expect(sanitizeCsvCell('পণ্য')).toBe('পণ্য');
     expect(sanitizeCsvCell('')).toBe('');

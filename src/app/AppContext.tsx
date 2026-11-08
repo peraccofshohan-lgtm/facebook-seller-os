@@ -34,10 +34,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   // Push the number-format choice into the pure formatters so every screen
   // (not just the dashboard) shows digits the way the seller asked for.
-  useEffect(() => {
-    if (!settings) return;
+  //
+  // This runs during render, NOT inside an effect: child effects fire before
+  // parent effects, so an effect here would let every screen paint once with
+  // the module default and never correct itself on a cold page load.
+  if (settings) {
     setFormatPreference({ bengaliDigits: settings.locale?.bengaliDigits ?? true });
-  }, [settings]);
+  }
 
   // Apply the PIN gate once settings are known (on every app start / reload).
   useEffect(() => {
