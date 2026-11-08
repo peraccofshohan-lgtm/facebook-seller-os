@@ -27,7 +27,11 @@ dist/
 └── favicon.ico
 ```
 
-আকার (v1.0.0): মোট ~৭৯০ kB precache; JS gzip-এ ~১১০ kB + React ~৫৪ kB + Dexie ~৩৩ kB।
+আকার (v1.0.0, ২০২৬-১১-০৮-এ করা বিল্ড থেকে পরিমাপ করা):
+- Service Worker precache: **২২ এন্ট্রি, ৮২৪.৪২ KiB**
+- `index.html` ১.৮১ kB (gzip ০.৮৩ kB), CSS ৩৬.০২ kB (gzip ৭.৬০ kB)
+- JS: `db` (Dexie) ৯৯.৬৪ kB (gzip ৩২.৫৯), `react` ১৬৫.৭৪ kB (gzip ৫৪.২৪), `index` ৪৯৬.১৬ kB (gzip ১২৩.৪৬)
+- অর্থাৎ প্রথম লোডে মোট **~৮২৪ kB**, যার বড় অংশই অ্যাসেট/আইকন; পরবর্তী লোডে সব ক্যাশ থেকে।
 
 ---
 

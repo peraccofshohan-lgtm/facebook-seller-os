@@ -83,6 +83,7 @@ Windows/Mac: Chrome/Edge-এর ঠিকানা বারের **ইনস�
 | [SECURITY_AND_PRIVACY.md](SECURITY_AND_PRIVACY.md) | নিরাপত্তা ও গোপনীয়তা — সীমাবদ্ধতা সহ |
 | [BACKUP_AND_RESTORE.md](BACKUP_AND_RESTORE.md) | ব্যাকআপ নেওয়া ও ফেরত আনা |
 | [TESTING.md](TESTING.md) | টেস্ট চালানো ও কী ঢাকা আছে |
+| [AUDIT_REPORT_BN.md](AUDIT_REPORT_BN.md) | প্রকাশের আগের স্বাধীন নিরীক্ষা — কী যাচাই হয়েছে, কী হয়নি, কী ঠিক করা হয়েছে |
 | [DEPLOYMENT.md](DEPLOYMENT.md) | কোথায় ও কীভাবে হোস্ট করবেন |
 | [USER_GUIDE_BN.md](USER_GUIDE_BN.md) | বাংলায় পুরো ব্যবহারবিধি |
 | [IMPLEMENTATION_ROADMAP.md](IMPLEMENTATION_ROADMAP.md) | কীভাবে বানানো হয়েছে, পরের পরিকল্পনা |
