@@ -145,7 +145,12 @@ export function periodProfit(input: PeriodProfitInput): PeriodProfit {
   const netRevenue = subMoney(grossSales, discounts, refunds);
   const grossProfit = subMoney(netRevenue, cogs);
   const operatingExpenses = sumMoney(
-    input.expenses.filter((e) => !e.voidedAt).map((e) => e.amount),
+    input.expenses
+      // An expense generated from a courier record is the SAME money as the
+      // courier cost already subtracted inside each order's estimated profit.
+      // Counting it here as well would charge the seller twice for one parcel.
+      .filter((e) => !e.voidedAt && !e.courierRecordId)
+      .map((e) => e.amount),
   );
   const courierCosts = sumMoney(input.courierRecords.map(courierCostOf));
   const operatingProfit = subMoney(grossProfit, operatingExpenses);

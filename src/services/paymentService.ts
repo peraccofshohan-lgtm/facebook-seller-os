@@ -29,18 +29,28 @@ function validPayment(p: Payment): boolean {
 }
 
 export async function totalsForOrder(orderId: ID): Promise<OrderPaymentTotals> {
-  const payments = (await db.payments.where('orderId').equals(orderId).toArray()).filter(validPayment);
-  return totalsFromPayments(payments);
+  const [payments, order] = await Promise.all([
+    db.payments.where('orderId').equals(orderId).toArray(),
+    db.orders.get(orderId),
+  ]);
+  return totalsFromPayments(payments.filter(validPayment), order?.total);
 }
 
-export function totalsFromPayments(payments: Payment[]): OrderPaymentTotals {
+/**
+ * `due` can only be computed when the order total is supplied — this helper
+ * works on payments alone, so callers that do know the total must pass it.
+ * (It used to be hard-coded to 0, which quietly meant "nothing is owed".)
+ */
+export function totalsFromPayments(payments: Payment[], orderTotal?: Minor): OrderPaymentTotals {
   let paidIn = 0;
   let refundedOut = 0;
   for (const p of payments) {
     if (p.kind === 'order_payment' && p.direction === 'in') paidIn = addMoney(paidIn, p.amount);
     if (p.kind === 'order_refund' && p.direction === 'out') refundedOut = addMoney(refundedOut, p.amount);
   }
-  return { paidIn, refundedOut, netPaid: subMoney(paidIn, refundedOut), due: 0 };
+  const netPaid = subMoney(paidIn, refundedOut);
+  const due = orderTotal === undefined ? 0 : Math.max(subMoney(orderTotal, netPaid), 0);
+  return { paidIn, refundedOut, netPaid, due };
 }
 
 export async function totalsForOrders(orderIds: ID[]): Promise<Map<ID, OrderPaymentTotals>> {

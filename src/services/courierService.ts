@@ -220,6 +220,13 @@ export async function codSummary(): Promise<CodSummary> {
       returnCosts = addMoney(returnCosts, Math.abs(payout.net));
       continue;
     }
+    // Still with the courier: nothing has been collected yet, so the declared
+    // COD belongs in the pipeline. (It must not be booked as a receivable — and
+    // the courier's fee on an undelivered parcel is a cost, not negative income.)
+    if (record.status === 'pending' || record.status === 'in_transit' || record.status === 'hold') {
+      pipelineCod = addMoney(pipelineCod, record.codAmount);
+      continue;
+    }
     if (payout.net === 0) {
       pipelineCod = addMoney(pipelineCod, record.codAmount);
       continue;

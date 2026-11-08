@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { addProduct, onboard, openScreen, resetApp, ui, visibleText } from './support';
 
 /**
@@ -72,7 +72,7 @@ test.describe('offline first', () => {
   });
 });
 
-async function createOrderOfflineCheck(page: import('@playwright/test').Page) {
+async function createOrderOfflineCheck(page: Page) {
   await page.goto('/orders/new');
   await page.getByLabel(ui.ORDER_CUSTOMER_NAME).fill('রিমা আক্তার');
   await page.getByLabel(ui.ORDER_PHONE).fill('01712345678');
