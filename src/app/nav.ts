@@ -38,5 +38,6 @@ export const QUICK_ACTIONS: QuickAction[] = [
   { to: '/payments?action=new', label: 'পেমেন্ট নিন', icon: 'payments' },
   { to: '/expenses?action=new', label: 'খরচ লিখুন', icon: 'expenses' },
   { to: '/courier?action=new', label: 'কুরিয়ার রেকর্ড', icon: 'courier' },
+  { to: '/courier/slips', label: 'বুকিং স্লিপ', icon: 'print' },
   { to: '/returns?action=new', label: 'রিটার্ন নথিভুক্ত', icon: 'returns' },
 ];

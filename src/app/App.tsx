@@ -19,6 +19,7 @@ import ProductFormPage from '@/features/products/ProductFormPage';
 import ProductDetailsPage from '@/features/products/ProductDetailsPage';
 import InventoryPage from '@/features/inventory/InventoryPage';
 import CourierPage from '@/features/courier/CourierPage';
+import CourierSlipsPage from '@/features/courier/CourierSlipsPage';
 import PaymentsPage from '@/features/payments/PaymentsPage';
 import ReturnsPage from '@/features/returns/ReturnsPage';
 import ExpensesPage from '@/features/expenses/ExpensesPage';
@@ -86,6 +87,7 @@ export default function App() {
                 <Route path="/products/:id/edit" element={<ProductFormPage />} />
                 <Route path="/inventory" element={<InventoryPage />} />
                 <Route path="/courier" element={<CourierPage />} />
+                <Route path="/courier/slips" element={<CourierSlipsPage />} />
                 <Route path="/payments" element={<PaymentsPage />} />
                 <Route path="/returns" element={<ReturnsPage />} />
                 <Route path="/expenses" element={<ExpensesPage />} />

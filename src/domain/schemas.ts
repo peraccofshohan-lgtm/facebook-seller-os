@@ -438,6 +438,9 @@ export const noteTemplateInputSchema = z.object({
 
 export type NoteTemplateInput = z.infer<typeof noteTemplateInputSchema>;
 
+/** What a caller may pass: the optional styling fields can be left out. */
+export type NoteTemplateDraft = z.input<typeof noteTemplateInputSchema>;
+
 /* ------------------------------------------------------------------ */
 /* V2: Recurring expenses & reminders                                  */
 /* ------------------------------------------------------------------ */

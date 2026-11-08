@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Card, CardBody, CardHeader, StatCard } from '@/components/ui/Card';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Button } from '@/components/ui/Button';
@@ -197,6 +197,11 @@ export default function CourierPage() {
       align: 'right',
       render: (record) => (
         <div className="flex justify-end gap-1">
+          <Link to={`/courier/slips?records=${record.id}`}>
+            <Button size="sm" variant="ghost" icon="print">
+              স্লিপ
+            </Button>
+          </Link>
           <Button
             size="sm"
             variant="ghost"
@@ -296,6 +301,11 @@ export default function CourierPage() {
         subtitle="কনসাইনমেন্ট ও পেআউট হাতে নথিভুক্ত করুন — কোনো API সংযোগ নেই"
         actions={
           <>
+            <Link to="/courier/slips">
+              <Button variant="outline" icon="print">
+                স্লিপ / লেবেল
+              </Button>
+            </Link>
             <Button variant="outline" icon="download" onClick={async () => downloadCsv(await exportCourierCsv(), `courier-${Date.now()}.csv`)}>
               CSV
             </Button>
@@ -381,6 +391,11 @@ export default function CourierPage() {
                       <span className="text-brand-700">পেয়েছেন {formatMoney(settled.data?.get(record.id) ?? 0)}</span>
                     </div>
                     <div className="mt-2 flex gap-2">
+                      <Link to={`/courier/slips?records=${record.id}`}>
+                        <Button size="sm" variant="outline" icon="print">
+                          স্লিপ
+                        </Button>
+                      </Link>
                       <Button
                         size="sm"
                         variant="outline"
