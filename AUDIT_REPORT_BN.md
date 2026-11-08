@@ -2,7 +2,8 @@
 
 **তারিখ:** ৮ নভেম্বর ২০২৬
 **ব্রাঞ্চ:** `arena/5720b23d-facebook-seller-os`
-**নিরীক্ষার শেষ কমিট:** `606f126`
+**নিরীক্ষার শেষ কমিট:** `81e58a1` (প্রতিবেদনটি নিজেই এই কমিটে আছে)
+**CI রান:** [42524808612](https://github.com/peraccofshohan-lgtm/facebook-seller-os/actions/runs/42524808612) — দুটো জবই পাস (১মি৩৬সে / ৪৮সে)
 **নিরীক্ষার ধরন:** প্রকাশের আগে স্বাধীন যাচাই — নতুন কোনো ফিচার যোগ করা হয়নি,
 স্থাপত্য (একক ডিভাইস · অফলাইন-ফার্স্ট) অপরিবর্তিত, কোনো পেইড সার্ভিস/ক্লাউড/মাল্টি-ইউজার
 সংযোগ যোগ করা হয়নি।
@@ -34,8 +35,9 @@
 |---|---|---|
 | [42522101454](https://github.com/peraccofshohan-lgtm/facebook-seller-os/actions/runs/42522101454) | `a610089` | দুটো জব পাস (৫৪সে / ১মি২৬সে) |
 | 42522506244 / 42522510456 | `8824163` | দুটো জব পাস (১মি২৬সে / ১মি৬সে) |
-| [42523987723](https://github.com/peraccofshohan-lgtm/facebook-seller-os/actions/runs/42523987723) | **`606f126`** | E2E **পাস** (১মি৩১সে) |
-| [42523991198](https://github.com/peraccofshohan-lgtm/facebook-seller-os/actions/runs/42523991198) | **`606f126`** | Verify **পাস** (৪৩সে) |
+| [42523987723](https://github.com/peraccofshohan-lgtm/facebook-seller-os/actions/runs/42523987723) | `606f126` | E2E **পাস** (১মি৩১সে) |
+| [42523991198](https://github.com/peraccofshohan-lgtm/facebook-seller-os/actions/runs/42523991198) | `606f126` | Verify **পাস** (৪৩সে) |
+| [42524808612](https://github.com/peraccofshohan-lgtm/facebook-seller-os/actions/runs/42524808612) | **`81e58a1`** | Verify **পাস** (৪৮সে) + E2E **পাস** (১মি৩৬সে) |
 
 ### ক.২ স্থানীয়ভাবে পুরো যাচাই (এই স্যান্ডবক্সে চালানো)
 
@@ -207,8 +209,8 @@ npm run test:e2e      →  16 passed (41.4s)  [আসল Chromium 153, 390×844]
 
 - **PR [#1](https://github.com/peraccofshohan-lgtm/facebook-seller-os/pull/1)** — **OPEN**, MERGEABLE ✅
 - ব্রাঞ্চ `arena/5720b23d-facebook-seller-os` → `main`
-- কমিট: `7e5c0fc` → `3526fca` → `a610089` → `8824163` → **`606f126`** (সব পুশ করা, কিছুই অসংরক্ষিত নেই)
-- **CI: সবুজ** — দুটো জবই পাস (`606f126`-এর রান 42523987723 ও 42523991198)
+- কমিট: `7e5c0fc` → `3526fca` → `a610089` → `8824163` → `606f126` → **`81e58a1`** (সব পুশ করা, কিছুই অসংরক্ষিত নেই)
+- **CI: সবুজ** — সব কমিটেই দুটো জবই পাস; শেষ রান [42524808612](https://github.com/peraccofshohan-lgtm/facebook-seller-os/actions/runs/42524808612) (`81e58a1`)
 - রিভিউ-এর জন্য তৈরি; মার্জ করা হয়নি (মার্জ করবেন আপনি)।
 
 ---
