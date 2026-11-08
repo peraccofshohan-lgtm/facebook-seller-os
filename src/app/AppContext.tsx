@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { getSettings } from '@/services/settingsService';
 import type { Settings } from '@/domain/types';
+import { setFormatPreference } from '@/lib/format-prefs';
 
 interface AppContextValue {
   /** Bumped after every mutation so list queries refetch. */
@@ -30,6 +31,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     void refreshSettings();
   }, [refreshSettings, version]);
+
+  // Push the number-format choice into the pure formatters so every screen
+  // (not just the dashboard) shows digits the way the seller asked for.
+  useEffect(() => {
+    if (!settings) return;
+    setFormatPreference({ bengaliDigits: settings.locale?.bengaliDigits ?? true });
+  }, [settings]);
 
   // Apply the PIN gate once settings are known (on every app start / reload).
   useEffect(() => {

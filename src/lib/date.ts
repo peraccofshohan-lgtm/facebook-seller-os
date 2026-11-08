@@ -8,6 +8,8 @@
  *    stays correct even if the IANA database changes.
  */
 
+import { prefersBengaliDigits } from './format-prefs';
+
 export const DEFAULT_TIME_ZONE = 'Asia/Dhaka';
 
 export function nowMs(): number {
@@ -205,7 +207,7 @@ export function formatDate(value: Date | number | string | null | undefined, opt
   if (value === null || value === undefined || value === '') return '—';
   const date = toDate(value);
   if (Number.isNaN(date.getTime())) return '—';
-  const { bengaliDigits = true, withTime = false, timeZone = DEFAULT_TIME_ZONE } = options;
+  const { bengaliDigits = prefersBengaliDigits(), withTime = false, timeZone = DEFAULT_TIME_ZONE } = options;
   const p = dhakaParts(date, timeZone);
   let text = `${p.day} ${MONTHS_BN[p.month - 1]} ${p.year}`;
   if (withTime) {

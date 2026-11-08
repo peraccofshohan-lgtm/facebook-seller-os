@@ -1,41 +1,86 @@
-import { expect, test, type Page } from '@playwright/test';
-
-/** Fresh install: every test starts from an empty database. */
-async function resetApp(page: Page) {
-  await page.goto('/');
-  await page.evaluate(async () => {
-    await new Promise<void>((resolve, reject) => {
-      const request = indexedDB.deleteDatabase('facebook-seller-os');
-      request.onsuccess = () => resolve();
-      request.onerror = () => reject(request.error);
-      request.onblocked = () => resolve();
-    });
-  });
-  await page.reload();
-}
+import { expect, test } from '@playwright/test';
+import { addProduct, onboard, openScreen, resetApp, setBengaliDigits, ui, visibleText } from './support';
 
 test.describe('first run', () => {
-  test('a brand-new seller is guided through setup and lands on the dashboard', async ({ page }) => {
+  test('a brand-new seller is guided through setup and lands on an honest empty dashboard', async ({
+    page,
+  }) => {
     await resetApp(page);
 
     await expect(page.getByText('Facebook Seller OS-এ স্বাগতম')).toBeVisible();
-    await page.getByLabel('ব্যবসার নাম').fill('রিমা কালেকশন');
-    await page.getByRole('button', { name: 'শুরু করুন' }).click();
+    await onboard(page, { latinDigits: false });
 
-    await expect(page.getByText(/আপনার ব্যবসার আজকের চিত্র/)).toBeVisible();
-    // Nothing is fabricated: an empty business shows an empty state and zeroes.
-    await expect(page.getByText(/আপনার ব্যবসার তথ্য এখনো যোগ করা হয়নি/)).toBeVisible();
+    // Nothing is invented: a business with no data shows an empty state, not fake numbers.
+    await expect(page.getByText(ui.DASHBOARD_EMPTY)).toBeVisible();
   });
 
-  test('the whole app is in Bengali and the navigation is reachable on a phone', async ({ page }) => {
+  test('every module is reachable from the phone navigation', async ({ page }) => {
     await resetApp(page);
-    await page.getByLabel('ব্যবসার নাম').fill('রিমা কালেকশন');
-    await page.getByRole('button', { name: 'শুরু করুন' }).click();
-    await expect(page.getByText(/আপনার ব্যবসার আজকের চিত্র/)).toBeVisible();
+    await onboard(page);
 
-    const nav = page.getByRole('navigation', { name: 'প্রধান নেভিগেশন' });
-    for (const label of ['অর্ডার', 'কাস্টমার', 'পণ্য', 'স্টক', 'কুরিয়ার', 'পেমেন্ট', 'রিটার্ন', 'খরচ', 'রিপোর্ট']) {
-      await expect(nav.getByRole('link', { name: new RegExp(label) })).toBeVisible();
+    await page.getByRole('navigation', { name: 'নিচের নেভিগেশন' }).getByRole('button', { name: ui.MORE }).click();
+    const menu = page.getByRole('dialog');
+
+    for (const label of [
+      ui.NAV_ORDERS,
+      ui.NAV_CUSTOMERS,
+      ui.NAV_PRODUCTS,
+      ui.NAV_INVENTORY,
+      ui.NAV_COURIER,
+      ui.NAV_PAYMENTS,
+      ui.NAV_RETURNS,
+      ui.NAV_EXPENSES,
+      ui.NAV_REPORTS,
+      ui.NAV_BACKUP,
+      ui.NAV_SETTINGS,
+    ]) {
+      await expect(menu.getByRole('link', { name: label, exact: true })).toBeVisible();
     }
+  });
+
+  test('every screen opens with a Bengali heading and no crash', async ({ page }) => {
+    const crashes: string[] = [];
+    page.on('pageerror', (error) => crashes.push(String(error)));
+
+    await resetApp(page);
+    await onboard(page);
+
+    for (const label of [
+      ui.NAV_ORDERS,
+      ui.NAV_CUSTOMERS,
+      ui.NAV_PRODUCTS,
+      ui.NAV_INVENTORY,
+      ui.NAV_COURIER,
+      ui.NAV_PAYMENTS,
+      ui.NAV_RETURNS,
+      ui.NAV_EXPENSES,
+      ui.NAV_REPORTS,
+      ui.NAV_BACKUP,
+      ui.NAV_SETTINGS,
+      ui.NAV_HOME,
+    ]) {
+      await openScreen(page, label);
+      await expect(page.getByRole('heading').first()).toBeVisible();
+    }
+
+    expect(crashes).toEqual([]);
+  });
+
+  test('the "numbers in Bangla" setting changes every screen, not just the dashboard', async ({
+    page,
+  }) => {
+    await resetApp(page);
+    // Shipped default: digits in Bangla.
+    await onboard(page, { latinDigits: false });
+    await addProduct(page, { name: 'টি-শার্ট', cost: '400', price: '700', stock: '10' });
+
+    await expect(visibleText(page, '৳৭০০')).toBeVisible();
+    await expect(page.getByText('৳700')).toHaveCount(0);
+
+    // Turning the setting off must reach this screen too.
+    await setBengaliDigits(page, false);
+    await openScreen(page, ui.NAV_PRODUCTS);
+    await expect(visibleText(page, '৳700')).toBeVisible();
+    await expect(page.getByText('৳৭০০')).toHaveCount(0);
   });
 });

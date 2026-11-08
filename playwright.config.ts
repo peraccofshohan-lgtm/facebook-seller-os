@@ -20,10 +20,23 @@ export default defineConfig({
     trace: 'on-first-retry',
     locale: 'bn-BD',
     timezoneId: 'Asia/Dhaka',
-    viewport: { width: 390, height: 844 }, // phone-sized: the app is mobile-first
+    // Set CHROMIUM_BIN to drive a browser that is already on the machine
+    // (useful when the Playwright CDN cannot be reached).
+    launchOptions: process.env.CHROMIUM_BIN ? { executablePath: process.env.CHROMIUM_BIN } : {},
   },
   projects: [
-    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+    {
+      name: 'chromium',
+      use: {
+        ...devices['Desktop Chrome'],
+        // Kept explicitly: the device preset above would otherwise reset the
+        // phone-sized viewport that the app is designed for.
+        viewport: { width: 390, height: 844 },
+        launchOptions: process.env.CHROMIUM_BIN
+          ? { executablePath: process.env.CHROMIUM_BIN, args: ['--no-sandbox', '--disable-dev-shm-usage'] }
+          : {},
+      },
+    },
   ],
   webServer: {
     command: 'npm run preview',

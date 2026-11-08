@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
+import { prefersBengaliDigits, resetFormatPreference, setFormatPreference } from '@/lib/format-prefs';
 import {
   MoneyError,
   addMoney,
@@ -87,22 +88,46 @@ describe('digit conversion', () => {
 });
 
 describe('formatMoney', () => {
+  // These assertions must not depend on whatever the last test left behind.
+  afterEach(() => resetFormatPreference());
+
   it('formats paisa as taka with the ৳ symbol', () => {
+    setFormatPreference({ bengaliDigits: false });
     expect(formatMoney(120000)).toBe('৳1,200');
     expect(formatMoney(120000, { alwaysDecimals: true })).toBe('৳1,200.00');
     expect(formatMoney(120000, { alwaysDecimals: true, bengaliDigits: true })).toBe('৳১,২০০.০০');
   });
 
   it('formats zero and negative amounts', () => {
+    setFormatPreference({ bengaliDigits: false });
     expect(formatMoney(0)).toBe('৳0');
     expect(formatMoney(0, { alwaysDecimals: true })).toBe('৳0.00');
     expect(formatMoney(-5000)).toBe('-৳50');
   });
 
   it('formats compact amounts for dashboards', () => {
+    setFormatPreference({ bengaliDigits: false });
     expect(formatMoney(15000000, { compact: true })).toBe('৳1.50 লাখ');
     expect(formatMoney(12345000, { compact: true })).toBe('৳1.23 লাখ');
     expect(formatMoney(500000, { compact: true })).toBe('৳5.0 হাজার');
     expect(formatMoney(2500000000, { compact: true })).toBe('৳2.50 কোটি');
+  });
+
+  it('follows the app-wide preference when a caller passes no option', () => {
+    // Regression: the "সংখ্যা বাংলায় দেখান" setting must reach every screen,
+    // not only the dashboard that happens to pass the flag by hand.
+    setFormatPreference({ bengaliDigits: true });
+    expect(prefersBengaliDigits()).toBe(true);
+    expect(formatMoney(146000)).toBe('৳১,৪৬০');
+
+    setFormatPreference({ bengaliDigits: false });
+    expect(formatMoney(146000)).toBe('৳1,460');
+  });
+
+  it('lets an explicit option override the app-wide preference', () => {
+    setFormatPreference({ bengaliDigits: true });
+    expect(formatMoney(146000, { bengaliDigits: false })).toBe('৳1,460');
+    setFormatPreference({ bengaliDigits: false });
+    expect(formatMoney(146000, { bengaliDigits: true })).toBe('৳১,৪৬০');
   });
 });

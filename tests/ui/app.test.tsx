@@ -79,7 +79,7 @@ describe('product screen', () => {
 
     renderAt('/products');
     expect((await screen.findAllByText('টি-শার্ট')).length).toBeGreaterThan(0);
-    expect(screen.getAllByText('৳700').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('৳৭০০').length).toBeGreaterThan(0);
     expect(screen.getAllByText('8').length).toBeGreaterThan(0);
   });
 

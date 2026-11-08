@@ -9,15 +9,29 @@
  */
 
 import { z } from 'zod';
-import { parseMoney } from '@/lib/money';
+import { assertMinor, parseMoney } from '@/lib/money';
 import { fromDateInputValue } from '@/lib/date';
 import { isValidBdPhone, normalizePhone } from '@/lib/search';
 
+/**
+ * Money field — two very different inputs, two different rules:
+ *
+ *  - a STRING is seller text or a CSV cell in taka ("1,200", "১২০০", "1200.50")
+ *    and is converted to paisa.
+ *  - a NUMBER is ALREADY paisa. That is what `MoneyInput` produces, what every
+ *    service hands around, and what the tests build. It is validated, never
+ *    converted again.
+ *
+ * The second rule exists because of a real defect: `parseMoney` reads a number
+ * as taka, so a price typed as 400 taka arrived here as 40000 paisa and became
+ * 4,000,000 — every price entered through the UI was stored 100× too large,
+ * which then inflated order totals, profit, stock value and every report.
+ */
 const moneyField = z
   .union([z.string(), z.number()])
   .transform((v, ctx) => {
     try {
-      const minor = parseMoney(v);
+      const minor = typeof v === 'number' ? assertMinor(v) : parseMoney(v);
       if (!Number.isSafeInteger(minor)) throw new Error('overflow');
       return minor;
     } catch {
@@ -76,7 +90,7 @@ export const productInputSchema = z.object({
     .transform((v, ctx) => {
       if (v === null || v === undefined || v === '') return null;
       try {
-        return parseMoney(v);
+        return typeof v === 'number' ? assertMinor(v) : parseMoney(v);
       } catch {
         ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'সঠিক টাকার অঙ্ক দিন' });
         return z.NEVER;

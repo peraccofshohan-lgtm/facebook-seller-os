@@ -9,6 +9,8 @@
  * which is far above any realistic small-business value.
  */
 
+import { prefersBengaliDigits } from './format-prefs';
+
 export type Minor = number;
 
 const MINOR_UNITS = 100;
@@ -214,7 +216,7 @@ export interface FormatMoneyOptions {
 
 /** Format minor units as a Taka string. Never loses precision (input is already paisa). */
 export function formatMoney(minor: Minor, options: FormatMoneyOptions = {}): string {
-  const { bengaliDigits = false, symbol = true, alwaysDecimals = false, compact = false } = options;
+  const { bengaliDigits = prefersBengaliDigits(), symbol = true, alwaysDecimals = false, compact = false } = options;
   const negative = minor < 0;
   const abs = Math.abs(Math.trunc(minor));
   const paisa = abs % 100;

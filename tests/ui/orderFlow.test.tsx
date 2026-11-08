@@ -78,7 +78,7 @@ describe('creating an order through the UI', () => {
     await user.type(delivery, '60');
 
     // 6. Totals are computed live: 2 × 700 + 60 = 1,460.
-    await waitFor(() => expect(screen.getByText('৳1,460')).toBeTruthy());
+    await waitFor(() => expect(screen.getByText('৳১,৪৬০')).toBeTruthy());
 
     // 7. Confirming the order is what commits stock — a draft must not move stock.
     await user.selectOptions(screen.getByLabelText('স্ট্যাটাস'), 'confirmed');
