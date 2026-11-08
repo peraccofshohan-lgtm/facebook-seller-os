@@ -20,6 +20,7 @@ import { parseCsv } from '@/lib/csv';
 import { parseMoney } from '@/lib/money';
 import { db } from '@/db/db';
 import { line, orderInput, seedProductWithStock } from '../helpers/factories';
+import { newCustomerFields } from '@/domain/newRecord';
 
 const tk = parseMoney;
 
@@ -87,6 +88,7 @@ describe('CSV export', () => {
       tags: ['ভিআইপি'],
       status: 'active',
       lastOrderAt: null,
+      ...newCustomerFields(),
       createdAt: Date.now(),
       updatedAt: Date.now(),
       archivedAt: null,

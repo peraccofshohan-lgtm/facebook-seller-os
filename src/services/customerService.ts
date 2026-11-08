@@ -12,6 +12,7 @@ import { matchesQuery, namesLookSimilar, normalizePhone, searchKey } from '@/lib
 import type { Customer, ID, Order } from '@/domain/types';
 import type { CustomerInput } from '@/domain/schemas';
 import type { Minor } from '@/lib/money';
+import { newCustomerFields } from '@/domain/newRecord';
 
 export interface CustomerQuery {
   query?: string;
@@ -92,6 +93,7 @@ export async function createCustomer(input: CustomerInput): Promise<Customer> {
     tags: input.tags ?? [],
     status: input.status ?? 'active',
     lastOrderAt: null,
+    ...newCustomerFields(),
     createdAt: now,
     updatedAt: now,
     archivedAt: null,

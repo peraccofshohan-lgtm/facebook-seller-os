@@ -15,6 +15,7 @@ import { addMoney, type Minor } from '@/lib/money';
 import type { Expense, ID } from '@/domain/types';
 import type { ExpenseInput } from '@/domain/schemas';
 import { nextNumber } from './settingsService';
+import { newExpenseFields } from '@/domain/newRecord';
 
 export interface ExpenseQuery {
   query?: string;
@@ -74,6 +75,7 @@ export async function createExpense(input: ExpenseInput): Promise<Expense> {
     reference: input.reference,
     description: input.description,
     note: input.note,
+    ...newExpenseFields(),
     voidedAt: null,
     courierRecordId: null,
     createdAt: now,
@@ -197,6 +199,7 @@ export async function syncExpenseFromCourier(
     note: 'কুরিয়ার রেকর্ড থেকে স্বয়ংক্রিয়ভাবে তৈরি',
     voidedAt: null,
     courierRecordId: record.id,
+    ...newExpenseFields(),
     createdAt: now,
     updatedAt: now,
     archivedAt: null,

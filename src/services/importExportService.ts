@@ -18,6 +18,7 @@ import { randomId } from '@/lib/id';
 import { applyMovement } from './inventoryService';
 import { getSettings } from './settingsService';
 import type { CourierRecord, Customer, Expense, Order, Payment, Product, ProductVariant, StockMovement } from '@/domain/types';
+import { newCustomerFields } from '@/domain/newRecord';
 
 /* ------------------------------------------------------------------ */
 /* Generic helpers                                                     */
@@ -656,6 +657,7 @@ export async function commitCustomerImport(rows: ImportRow[]): Promise<CommitRes
             tags,
             status: 'active',
             lastOrderAt: null,
+            ...newCustomerFields(),
             createdAt: now,
             updatedAt: now,
             archivedAt: null,

@@ -25,15 +25,78 @@ export interface Auditable {
 /* Settings & configuration                                            */
 /* ------------------------------------------------------------------ */
 
+/**
+ * BusinessProfile — the SELLER's own identity.
+ *
+ * IMPORTANT IDENTITY RULE (V2): these fields describe the person/business that runs the
+ * shop. The software's developer (Shohan Khan) is credited in Settings → About only and
+ * must never be substituted into an invoice, report, courier slip or customer document.
+ */
 export interface BusinessProfile {
   name: string;
+  /** Proprietor / owner name (V2). */
+  ownerName: string;
   logoDataUrl: string | null;
   address: string;
+  /** Area / thana part of the business address (V2). */
+  area: string;
+  /** District part of the business address (V2). */
+  district: string;
   phone: string;
+  /** Second contact number (V2). */
+  altPhone: string;
   email: string;
   website: string;
+  /** Short description of the business (V2). */
+  description: string;
+  /** Thank-you message printed on invoices (V2). */
+  thankYouMessage: string;
   /** Optional trade licence / TIN shown on invoices. */
   registrationNote: string;
+}
+
+/**
+ * A frozen copy of the business identity taken when a document was produced, so that
+ * reprinting an old courier slip or invoice shows what the business looked like then.
+ */
+export interface BusinessSnapshot {
+  name: string;
+  ownerName: string;
+  logoDataUrl: string | null;
+  address: string;
+  area: string;
+  district: string;
+  phone: string;
+  altPhone: string;
+  email: string;
+  website: string;
+}
+
+/**
+ * BrandingSettings — how the business identity is presented on documents (V2).
+ * Kept separate from BusinessProfile so that changing a phone number does not
+ * silently reshape every layout choice the seller made.
+ */
+export interface BrandingSettings {
+  tagline: string;
+  /** Footer line used on reports and non-invoice documents. */
+  documentFooter: string;
+  /** Where the logo is printed. */
+  showLogoOn: {
+    invoice: boolean;
+    courierSlip: boolean;
+    parcelLabel: boolean;
+    reports: boolean;
+  };
+  showSignature: boolean;
+  signatureLabel: string;
+  /** Printed under the signature line; defaults to the owner name. */
+  signatureName: string;
+  /** One of a small set of validated presets — never arbitrary CSS. */
+  accent: 'indigo' | 'emerald' | 'rose' | 'amber' | 'slate';
+  fontScale: 'small' | 'normal' | 'large';
+  align: 'left' | 'center' | 'right';
+  showBusinessDescription: boolean;
 }
 
 export interface CurrencySettings {
@@ -72,6 +135,47 @@ export interface InventorySettings {
   defaultLowStockThreshold: number;
 }
 
+/** Courier booking slip / parcel label / print behaviour (V2). */
+export interface DocumentSettings {
+  courierSlipPaper: 'a4' | 'pos';
+  /** Physical parcel label size. */
+  labelSize: 'small' | 'medium';
+  /** Note template pre-selected when a slip is created. */
+  defaultNoteTemplateId: ID | null;
+  showBarcode: boolean;
+  showQr: boolean;
+  /** Printed on every parcel label. */
+  fragileByDefault: boolean;
+  /** Page-break strategy for bulk printing. */
+  bulkPrintSpacing: 'compact' | 'page';
+}
+
+/** Promotion engine configuration (V2). */
+export interface PromotionSettings {
+  enabled: boolean;
+  /** Allow two or more promotions to apply to the same order at all. */
+  allowStacking: boolean;
+  loyaltyEnabled: boolean;
+  /** Points earned per whole 100 BDT of net sales. Integer. */
+  pointsPerHundredTaka: number;
+  /** Paisa of discount per redeemed point. */
+  paisaPerPoint: number;
+  referralEnabled: boolean;
+  /** Default reward when a referral converts (V2). */
+  referralPoints: number;
+}
+
+/** Which dashboard blocks the seller wants to see, and in what order (V2). */
+export interface DashboardSettings {
+  /** Keys of the KPI cards to show; empty means "show the defaults". */
+  visibleCards: string[];
+  showCharts: boolean;
+  showAttentionList: boolean;
+  showActivityFeed: boolean;
+  /** Comparison window for the headline deltas. */
+  trendWindowDays: number;
+}
+
 export interface SecuritySettings {
   pinEnabled: boolean;
   /** PBKDF2 record; the PIN itself is never stored. */
@@ -98,6 +202,11 @@ export interface Settings extends Record<string, unknown> {
   order: OrderSettings;
   inventory: InventorySettings;
   security: SecuritySettings;
+  /** V2: document/branding, promotion and dashboard preferences. */
+  branding: BrandingSettings;
+  documents: DocumentSettings;
+  promotions: PromotionSettings;
+  dashboard: DashboardSettings;
   backup: {
     lastBackupAt: Timestamp | null;
     reminderEnabled: boolean;
@@ -244,6 +353,19 @@ export interface Customer extends Auditable {
   status: CustomerStatus;
   /** Denormalised counters (recomputed by the customer service, never hand-edited). */
   lastOrderAt: Timestamp | null;
+
+  /* -------------------------------------------------------------- */
+  /* V2: segmentation, loyalty, referral                             */
+  /* -------------------------------------------------------------- */
+
+  /** Free-text segment label, e.g. "পাইকারি", "নতুন", "VIP" (V2). */
+  segment: string;
+  /** Running loyalty point balance (V2). Recomputed from the loyalty ledger. */
+  loyaltyPoints: number;
+  /** Short code a new customer can quote to credit this customer (V2). */
+  referralCode: string;
+  /** Who referred this customer, if known (V2). */
+  referredByCustomerId: ID | null;
 }
 
 /* ------------------------------------------------------------------ */
@@ -295,6 +417,14 @@ export interface OrderItem {
   discount: Minor;
   /** (unitPrice * quantity) - discount */
   lineTotal: Minor;
+  /**
+   * V2: true when this line was given away by a promotion (BOGO, Buy X Get Y, free gift).
+   * A free line has unitPrice 0, so it never counts as paid sales — but its unitCost is
+   * still real money and still lands in COGS.
+   */
+  isFreeGift: boolean;
+  /** V2: the promotion that produced this line's discount or freeness. */
+  promotionId: ID | null;
 }
 
 export type PaymentStatus = 'unpaid' | 'partial' | 'paid' | 'refunded' | 'overpaid';
@@ -336,6 +466,25 @@ export interface Order extends Auditable {
   returnRestocked: boolean;
   /** Courier COD amount declared at shipment. */
   codAmount: Minor;
+
+  /* -------------------------------------------------------------- */
+  /* V2: promotions, loyalty, referral                               */
+  /* -------------------------------------------------------------- */
+
+  /** Promotions that actually applied to this order (V2). */
+  promotionIds: ID[];
+  /** Total discount produced by promotions (V2). Part of `discount`. */
+  promotionDiscount: Minor;
+  /** Coupon code the customer used, if any (V2). */
+  couponCode: string;
+  /** Loyalty points earned by this order (V2). */
+  loyaltyPointsEarned: number;
+  /** Loyalty points spent on this order (V2). */
+  loyaltyPointsRedeemed: number;
+  /** Paisa of discount obtained by redeeming points (V2). Part of `discount`. */
+  loyaltyDiscount: Minor;
+  /** Referral record rewarded by this order (V2). */
+  referralId: ID | null;
 }
 
 export type OrderEventType =
@@ -431,6 +580,43 @@ export interface CourierRecord extends Auditable {
   payoutDate: Timestamp | null;
   payoutReference: string;
   note: string;
+
+  /* -------------------------------------------------------------- */
+  /* V2: courier booking slip & parcel label                         */
+  /* -------------------------------------------------------------- */
+
+  /** Number of physical parcels in this consignment (V2). */
+  parcelCount: number;
+  /** Declared value of the goods (V2). Snapshot of the order's net sales. */
+  declaredValue: Minor;
+  /** What the customer already paid before shipment (V2). Snapshot. */
+  advancePaid: Minor;
+  /** Fragile / handle-with-care markers (V2). */
+  fragile: boolean;
+  handleWithCare: boolean;
+  /** Handling instructions printed on the slip (V2). */
+  specialInstructions: string;
+  /** Seller's own note printed on the slip (V2). */
+  sellerNote: string;
+  /** Note template used when the slip was last printed (V2). */
+  noteTemplateId: ID | null;
+
+  /** Recipient snapshot, taken from the order/customer at booking time (V2). */
+  recipientName: string;
+  recipientPhone: string;
+  recipientAltPhone: string;
+  recipientAddress: string;
+  area: string;
+  district: string;
+  postcode: string;
+  /** Product names and quantities, frozen at booking time (V2). */
+  contentsSummary: string;
+
+  /** Sender (business) snapshot, frozen when the slip was first produced (V2). */
+  senderSnapshot: BusinessSnapshot | null;
+  /** When a booking slip was last produced, for reprint history (V2). */
+  lastSlipPrintedAt: Timestamp | null;
+  slipPrintCount: number;
 }
 
 /* ------------------------------------------------------------------ */
@@ -492,6 +678,251 @@ export interface ReturnRecord extends Auditable {
 /* Expenses                                                            */
 /* ------------------------------------------------------------------ */
 
+/* ------------------------------------------------------------------ */
+/* V2: Promotions, loyalty, referrals                                  */
+/* ------------------------------------------------------------------ */
+
+/**
+ * The seventeen offer shapes the seller can configure. Each name is a distinct,
+ * genuinely-implemented preset: it selects a default `mechanism`, a default set of
+ * eligibility fields and the wording shown in the UI. Nothing here is a label over a
+ * no-op — every type produces a real, tested discount calculation.
+ */
+export type PromotionType =
+  | 'percent'
+  | 'fixed'
+  | 'bogo'
+  | 'buy_x_get_y'
+  | 'free_gift'
+  | 'free_delivery'
+  | 'bundle'
+  | 'coupon'
+  | 'min_purchase'
+  | 'first_order'
+  | 'repeat_customer'
+  | 'seasonal'
+  | 'limited_time'
+  | 'product_specific'
+  | 'category_specific'
+  | 'loyalty_points'
+  | 'referral';
+
+/**
+ * HOW the discount is computed. Two promotion types may share a mechanism
+ * (a "seasonal" and a "percent" offer both take a percentage off) while differing in
+ * eligibility and reporting.
+ */
+export type PromotionMechanism =
+  | 'percent_off'
+  | 'amount_off'
+  | 'free_items'
+  | 'bundle_price'
+  | 'free_delivery'
+  | 'loyalty_points'
+  | 'referral_reward';
+
+export type PromotionStatus = 'draft' | 'active' | 'paused';
+
+export interface BundleItem {
+  productId: ID | null;
+  variantId: ID | null;
+  name: string;
+  quantity: number;
+}
+
+export interface GiftItem {
+  productId: ID | null;
+  variantId: ID | null;
+  name: string;
+  quantity: number;
+}
+
+export interface Promotion extends Auditable {
+  name: string;
+  description: string;
+  type: PromotionType;
+  mechanism: PromotionMechanism;
+  status: PromotionStatus;
+
+  /* Discount shape — only the fields relevant to `mechanism` are read. */
+  /** Whole or half percent, e.g. 10 or 12.5. */
+  percentOff: number;
+  amountOff: Minor;
+  /** Buy X… */
+  buyQuantity: number;
+  /** …get Y free (BOGO = buy 1 get 1). */
+  getQuantity: number;
+  bundleItems: BundleItem[];
+  /** Price for the whole bundle. */
+  bundlePrice: Minor;
+  giftItems: GiftItem[];
+
+  /* Eligibility */
+  startsAt: Timestamp;
+  /** null = runs forever. */
+  endsAt: Timestamp | null;
+  /** Empty = every product. */
+  productIds: ID[];
+  /** Empty = every category. */
+  categoryIds: ID[];
+  minOrderAmount: Minor;
+  /** Cap on the discount this promotion may produce, 0 = no cap. */
+  maxDiscount: Minor;
+  /** Total redemptions allowed; null = unlimited. */
+  usageLimit: number | null;
+  /** Denormalised redemption count, maintained by promotionService. */
+  usageCount: number;
+  /** Redemptions allowed per customer; null = unlimited. */
+  perCustomerLimit: number | null;
+  customerEligibility: 'all' | 'first_order' | 'repeat';
+  /** Only customers carrying one of these segments, empty = any. */
+  customerSegments: string[];
+  couponCode: string;
+
+  /* Stacking */
+  /** false = this promotion refuses to combine with any other. */
+  stackable: boolean;
+  /** Lower number wins when two promotions compete. */
+  priority: number;
+  /** Promotions sharing a non-empty group never apply together. */
+  combinationGroup: string;
+
+  terms: string;
+}
+
+/** What one promotion decided to do to one basket. */
+export interface PromotionResult {
+  promotionId: ID;
+  name: string;
+  type: PromotionType;
+  mechanism: PromotionMechanism;
+  /** Discount taken off item prices (paisa). */
+  itemDiscount: Minor;
+  /** Discount taken off the order as a whole (paisa). */
+  orderDiscount: Minor;
+  /** Delivery charge waived (paisa). */
+  deliveryDiscount: Minor;
+  /** Lines that become free. */
+  freeItems: Array<{ productId: ID | null; variantId: ID | null; name: string; quantity: number }>;
+  /** Loyalty points earned by the basket. */
+  pointsEarned: number;
+  /** Bengali explanation shown next to the order total. */
+  message: string;
+}
+
+/** One redemption, recorded so the promotion performance report can use real data. */
+export interface PromotionUsage extends Auditable {
+  promotionId: ID;
+  promotionName: string;
+  promotionType: PromotionType;
+  orderId: ID;
+  orderNumber: string;
+  customerId: ID | null;
+  customerName: string;
+  date: Timestamp;
+  itemDiscount: Minor;
+  orderDiscount: Minor;
+  deliveryDiscount: Minor;
+  /** itemDiscount + orderDiscount + deliveryDiscount */
+  totalDiscount: Minor;
+  /** Order total AFTER the discount, so "sales associated with the promotion" is honest. */
+  orderTotal: Minor;
+  orderNetSales: Minor;
+}
+
+export type LoyaltyEntryType = 'earn' | 'redeem' | 'adjust';
+
+export interface LoyaltyEntry extends Auditable {
+  customerId: ID;
+  orderId: ID | null;
+  promotionId: ID | null;
+  type: LoyaltyEntryType;
+  /** Signed: positive for earn/adjust-in, negative for redeem/adjust-out. */
+  points: number;
+  note: string;
+  date: Timestamp;
+}
+
+export type ReferralStatus = 'pending' | 'rewarded' | 'cancelled';
+export type ReferralRewardType = 'points' | 'discount' | 'cash';
+
+export interface Referral extends Auditable {
+  referrerCustomerId: ID;
+  referrerName: string;
+  /** New customer brought in; null while the referral is still just a lead. */
+  referredCustomerId: ID | null;
+  referredName: string;
+  /** Order that triggered the reward. */
+  orderId: ID | null;
+  status: ReferralStatus;
+  rewardType: ReferralRewardType;
+  rewardPoints: number;
+  rewardAmount: Minor;
+  note: string;
+  date: Timestamp;
+  rewardedAt: Timestamp | null;
+}
+
+/* ------------------------------------------------------------------ */
+/* V2: Document note templates                                         */
+/* ------------------------------------------------------------------ */
+
+export type NoteTemplateKind = 'courier_slip' | 'parcel_label' | 'invoice' | 'general';
+export type TextAlign = 'left' | 'center' | 'right';
+export type FontScale = 'small' | 'normal' | 'large';
+
+export interface NoteTemplate extends Auditable {
+  kind: NoteTemplateKind;
+  name: string;
+  body: string;
+  footer: string;
+  align: TextAlign;
+  fontScale: FontScale;
+  isActive: boolean;
+  /** Pre-selected for new documents of its kind. */
+  isDefault: boolean;
+}
+
+/* ------------------------------------------------------------------ */
+/* V2: Recurring expenses & reminders                                  */
+/* ------------------------------------------------------------------ */
+
+export type RecurrenceFrequency = 'daily' | 'weekly' | 'monthly' | 'yearly';
+
+export interface RecurringExpense extends Auditable {
+  name: string;
+  categoryId: ID | null;
+  amount: Minor;
+  method: string;
+  payee: string;
+  description: string;
+  note: string;
+  frequency: RecurrenceFrequency;
+  startDate: Timestamp;
+  /** Next date due. Advanced every time an expense is generated. */
+  nextRunDate: Timestamp;
+  /** null = repeats forever. */
+  endDate: Timestamp | null;
+  isActive: boolean;
+  lastGeneratedAt: Timestamp | null;
+  generatedCount: number;
+}
+
+export type ReminderPriority = 'low' | 'normal' | 'high';
+export type ReminderReferenceType = 'order' | 'customer' | 'courier' | 'expense' | 'general';
+
+/** A purely local reminder. No push server, no external messaging service. */
+export interface Reminder extends Auditable {
+  title: string;
+  note: string;
+  dueAt: Timestamp;
+  doneAt: Timestamp | null;
+  snoozedUntil: Timestamp | null;
+  referenceType: ReminderReferenceType;
+  referenceId: ID | null;
+  priority: ReminderPriority;
+}
+
 export interface Expense extends Auditable {
   expenseNumber: string;
   date: Timestamp;
@@ -510,6 +941,8 @@ export interface Expense extends Auditable {
    * counting the same courier cost twice.
    */
   courierRecordId: ID | null;
+  /** V2: set when a recurring-expense rule generated this expense. */
+  recurringExpenseId: ID | null;
 }
 
 /* ------------------------------------------------------------------ */

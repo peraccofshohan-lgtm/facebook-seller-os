@@ -17,6 +17,7 @@ import { addMoney, subMoney, sumMoney, type Minor } from '@/lib/money';
 import { courierCostOf } from '@/finance/profit';
 import type { CourierRecord, ID } from '@/domain/types';
 import type { CourierInput } from '@/domain/schemas';
+import { newCourierFields } from '@/domain/newRecord';
 
 export interface CourierQuery {
   query?: string;
@@ -93,6 +94,7 @@ export async function createCourierRecord(input: CourierInput): Promise<CourierR
     payoutDate: input.payoutDate ?? null,
     payoutReference: input.payoutReference,
     note: input.note,
+    ...newCourierFields(),
     createdAt: now,
     updatedAt: now,
     archivedAt: null,

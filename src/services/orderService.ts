@@ -23,6 +23,7 @@ import { refreshLastOrder } from './customerService';
 import { addOrderEventInternal, totalsForOrder } from './paymentService';
 import type { ID, Order, OrderEvent, OrderItem, OrderStatusKey } from '@/domain/types';
 import type { OrderInput, OrderItemInput } from '@/domain/schemas';
+import { newOrderFields, newOrderItemFields } from '@/domain/newRecord';
 
 export interface OrderQuery {
   query?: string;
@@ -132,6 +133,7 @@ function buildItems(input: OrderItemInput[]): OrderItem[] {
     unitCost: item.unitCost ?? 0,
     discount: item.discount ?? 0,
     lineTotal: 0,
+    ...newOrderItemFields(),
   }));
 }
 
@@ -198,6 +200,7 @@ export async function createOrder(input: OrderInput): Promise<Order> {
         notes: input.notes ?? '',
         customerInstructions: input.customerInstructions ?? '',
         cancelReason: input.cancelReason ?? '',
+        ...newOrderFields(),
         stockCommitted: false,
         returnRestocked: false,
         codAmount: 0,
@@ -307,6 +310,7 @@ export async function updateOrder(id: ID, patch: UpdateOrderInput): Promise<Orde
             unitCost: previous && previous.productId === (item.productId ?? null) ? previous.unitCost : (item.unitCost ?? 0),
             discount: item.discount ?? 0,
             lineTotal: 0,
+            ...newOrderItemFields(),
           };
         });
         next.items = nextItems;

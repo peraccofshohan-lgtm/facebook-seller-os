@@ -154,3 +154,172 @@ export const PAYMENT_KIND_LABEL: Record<string, string> = {
   adjustment_in: 'সমন্বয় (জমা)',
   adjustment_out: 'সমন্বয় (খরচ)',
 };
+
+/* ------------------------------------------------------------------ */
+/* V2: Promotions                                                      */
+/* ------------------------------------------------------------------ */
+
+import type {
+  FontScale,
+  PromotionMechanism,
+  PromotionStatus,
+  PromotionType,
+  RecurrenceFrequency,
+  ReminderPriority,
+  TextAlign,
+} from './types';
+
+export const PROMOTION_TYPE_LABEL: Record<PromotionType, string> = {
+  percent: 'শতাংশ ছাড়',
+  fixed: 'নির্দিষ্ট টাকা ছাড়',
+  bogo: 'BOGO — ১ কিনলে ১ ফ্রি',
+  buy_x_get_y: 'Buy X Get Y — কিনলে ফ্রি',
+  free_gift: 'ফ্রি গিফট',
+  free_delivery: 'ফ্রি ডেলিভারি',
+  bundle: 'বান্ডেল অফার',
+  coupon: 'কুপন কোড',
+  min_purchase: 'ন্যূনতম ক্রয়ে ছাড়',
+  first_order: 'প্রথম অর্ডারে ছাড়',
+  repeat_customer: 'পুনরায় ক্রয়কারী ছাড়',
+  seasonal: 'উৎসব/মৌসুমি ক্যাম্পেইন',
+  limited_time: 'সীমিত সময়ের অফার',
+  product_specific: 'নির্দিষ্ট পণ্যে ছাড়',
+  category_specific: 'নির্দিষ্ট ক্যাটেগরিতে ছাড়',
+  loyalty_points: 'লয়্যালটি পয়েন্ট',
+  referral: 'রেফারেল পুরস্কার',
+};
+
+export const PROMOTION_TYPE_HINT: Record<PromotionType, string> = {
+  percent: 'পুরো অর্ডার বা নির্বাচিত পণ্যে নির্দিষ্ট শতাংশ ছাড়।',
+  fixed: 'পুরো অর্ডার বা নির্বাচিত পণ্যে নির্দিষ্ট টাকা ছাড়।',
+  bogo: 'যোগ্য পণ্যের প্রতি ২টিতে ১টি ফ্রি (সস্তাটি ফ্রি হয়)।',
+  buy_x_get_y: 'নির্দিষ্ট সংখ্যক কিনলে আরও কয়েকটি ফ্রি — আপনিই X ও Y ঠিক করুন।',
+  free_gift: 'শর্ত পূরণ হলে একটি নির্দিষ্ট পণ্য উপহারে যোগ হয়।',
+  free_delivery: 'ডেলিভারি চার্জ সম্পূর্ণ মওকুফ।',
+  bundle: 'একাধিক পণ্য একসাথে নির্দিষ্ট দামে।',
+  coupon: 'একটি কোড দিয়ে ছাড় — কোড মিললে ছাড় পাওয়া যায়।',
+  min_purchase: 'ন্যূনতম টাকার ক্রয় করলে ছাড় পাওয়া যায়।',
+  first_order: 'যে কাস্টমার প্রথমবার কিনছেন, শুধু তাঁর জন্য।',
+  repeat_customer: 'যাঁরা আগে কিনেছেন, শুধু তাঁদের জন্য।',
+  seasonal: 'ঈদ, পহেলা বৈশাখ বা যেকোনো উৎসবের ক্যাম্পেইন।',
+  limited_time: 'নির্দিষ্ট সময়ের মধ্যেই ছাড় — সময় শেষে স্বয়ংক্রিয়ভাবে বন্ধ।',
+  product_specific: 'আপনি যে পণ্যগুলো বেছে দেবেন, শুধু সেগুলোতেই ছাড়।',
+  category_specific: 'আপনি যে ক্যাটেগরি বেছে দেবেন, তার সব পণ্যে ছাড়।',
+  loyalty_points: 'প্রতি নির্দিষ্ট টাকায় পয়েন্ট জমা হয়; পয়েন্ট দিয়ে ছাড় নেওয়া যায়।',
+  referral: 'কে কাকে রেফার করলেন, তার রেকর্ড ও পুরস্কার।',
+};
+
+/** Mechanism each type falls back to when the seller has not overridden it. */
+export const DEFAULT_MECHANISM: Record<PromotionType, PromotionMechanism> = {
+  percent: 'percent_off',
+  fixed: 'amount_off',
+  bogo: 'free_items',
+  buy_x_get_y: 'free_items',
+  free_gift: 'free_items',
+  free_delivery: 'free_delivery',
+  bundle: 'bundle_price',
+  coupon: 'percent_off',
+  min_purchase: 'amount_off',
+  first_order: 'percent_off',
+  repeat_customer: 'percent_off',
+  seasonal: 'percent_off',
+  limited_time: 'percent_off',
+  product_specific: 'percent_off',
+  category_specific: 'percent_off',
+  loyalty_points: 'loyalty_points',
+  referral: 'referral_reward',
+};
+
+export const MECHANISM_LABEL: Record<PromotionMechanism, string> = {
+  percent_off: 'শতাংশ ছাড়',
+  amount_off: 'নির্দিষ্ট টাকা ছাড়',
+  free_items: 'ফ্রি আইটেম',
+  bundle_price: 'বান্ডেল দাম',
+  free_delivery: 'ডেলিভারি চার্জ মওকুফ',
+  loyalty_points: 'লয়্যালটি পয়েন্ট',
+  referral_reward: 'রেফারেল পুরস্কার',
+};
+
+export const PROMOTION_STATUS_LABEL: Record<PromotionStatus, string> = {
+  draft: 'খসড়া',
+  active: 'চালু',
+  paused: 'বিরতিতে',
+};
+
+export const PROMOTION_STATUS_TONE: Record<PromotionStatus, string> = {
+  draft: 'bg-ink-100 text-ink-600',
+  active: 'bg-emerald-100 text-emerald-700',
+  paused: 'bg-amber-100 text-amber-700',
+};
+
+/** Types whose discount is a percentage rather than a fixed amount of money. */
+export const PERCENT_MECHANISMS: PromotionMechanism[] = ['percent_off'];
+export const AMOUNT_MECHANISMS: PromotionMechanism[] = ['amount_off'];
+export const FREE_ITEM_MECHANISMS: PromotionMechanism[] = ['free_items'];
+
+/* ------------------------------------------------------------------ */
+/* V2: Branding & documents                                            */
+/* ------------------------------------------------------------------ */
+
+export const ACCENT_PRESETS = [
+  { value: 'indigo', label: 'নীল (ডিফল্ট)', swatch: '#4f46e5' },
+  { value: 'emerald', label: 'সবুজ', swatch: '#059669' },
+  { value: 'rose', label: 'গোলাপি', swatch: '#e11d48' },
+  { value: 'amber', label: 'আম্বার', swatch: '#d97706' },
+  { value: 'slate', label: 'ধূসর', swatch: '#475569' },
+] as const;
+
+export const FONT_SCALE_LABEL: Record<FontScale, string> = {
+  small: 'ছোট',
+  normal: 'সাধারণ',
+  large: 'বড়',
+};
+
+export const FONT_SCALE_CLASS: Record<FontScale, string> = {
+  small: 'text-[11px]',
+  normal: 'text-[13px]',
+  large: 'text-[15px]',
+};
+
+export const ALIGN_LABEL: Record<TextAlign, string> = {
+  left: 'বামে',
+  center: 'মাঝখানে',
+  right: 'ডানে',
+};
+
+export const ALIGN_CLASS: Record<TextAlign, string> = {
+  left: 'text-left',
+  center: 'text-center',
+  right: 'text-right',
+};
+
+export const NOTE_KIND_LABEL: Record<string, string> = {
+  courier_slip: 'কুরিয়ার বুকিং স্লিপ',
+  parcel_label: 'পার্সেল লেবেল',
+  invoice: 'ইনভয়েস',
+  general: 'সাধারণ',
+};
+
+export const REMINDER_PRIORITY_LABEL: Record<ReminderPriority, string> = {
+  low: 'কম',
+  normal: 'সাধারণ',
+  high: 'জরুরি',
+};
+
+export const RECURRENCE_LABEL: Record<RecurrenceFrequency, string> = {
+  daily: 'প্রতিদিন',
+  weekly: 'প্রতি সপ্তাহে',
+  monthly: 'প্রতি মাসে',
+  yearly: 'প্রতি বছরে',
+};
+
+/**
+ * The software's own credit. Shown ONLY in Settings → About.
+ * It must never be used as (or overwrite) the seller's business identity on an
+ * invoice, report, courier slip, parcel label or any other business document.
+ */
+export const SOFTWARE_DEVELOPER = {
+  name: 'Shohan Khan',
+  email: 'helloiamshohan@gmail.com',
+  role: 'সফটওয়্যার নির্মাতা / ডেভেলপার',
+} as const;

@@ -11,7 +11,7 @@
  */
 
 import { openDatabase } from '@/db/db';
-import { ensureDefaultTaxonomies, ensureSettings } from '@/db/defaults';
+import { ensureDefaultTaxonomies, ensureNoteTemplates, ensureSettings } from '@/db/defaults';
 import { detectFutureSchema, runMigrations } from '@/db/migrations';
 import { APP_VERSION } from '@/services/settingsService';
 
@@ -20,6 +20,12 @@ export interface BootstrapResult {
   /** True when the stored data belongs to a newer app version. */
   futureSchema: boolean;
   migrationsApplied: number[];
+  /**
+   * Set when a migration threw. The app still opens with the previous schema version —
+   * we never leave the database half-migrated — and the seller is warned in Bengali so
+   * they can take a backup instead of losing data silently.
+   */
+  migrationError: string | null;
 }
 
 let promise: Promise<BootstrapResult> | null = null;
@@ -30,13 +36,26 @@ export function bootstrapApp(): Promise<BootstrapResult> {
     await openDatabase();
     await ensureSettings(APP_VERSION);
     await ensureDefaultTaxonomies();
-    const migration = await runMigrations();
+    await ensureNoteTemplates();
+
+    // A migration runs in its own transaction, so a failure rolls back that migration
+    // and nothing else. Catch it here so the app still opens on the old schema.
+    let migrationError: string | null = null;
+    let applied: number[] = [];
+    try {
+      const migration = await runMigrations();
+      applied = migration.applied;
+    } catch (error) {
+      migrationError = error instanceof Error ? error.message : String(error);
+    }
+
     const futureSchema = await detectFutureSchema();
     const settings = await ensureSettings(APP_VERSION);
     return {
       schemaVersion: settings.schemaVersion,
       futureSchema,
-      migrationsApplied: migration.applied,
+      migrationsApplied: applied,
+      migrationError,
     };
   })();
   return promise;
