@@ -4,6 +4,9 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { Button } from '@/components/ui/Button';
 import { Checkbox, Field, Input, Select, Textarea } from '@/components/ui/Field';
 import { MoneyInput, Tabs } from '@/components/ui/Controls';
+import { LogoUploadField } from '@/features/branding/LogoUploadField';
+import { BrandingBlock } from '@/features/branding/BrandingBlock';
+import { ACCENT_PRESETS, ALIGN_LABEL, FONT_SCALE_LABEL, SOFTWARE_DEVELOPER } from '@/domain/constants';
 import { Modal, ConfirmDialog } from '@/components/ui/Modal';
 import { ErrorBanner, InfoBanner, WarningBanner } from '@/components/ui/Feedback';
 import { Icon } from '@/components/ui/Icon';
@@ -17,11 +20,11 @@ import { rebuildStockLevels } from '@/services/inventoryService';
 import { randomId } from '@/lib/id';
 import { nowMs } from '@/lib/date';
 import { formatMoney } from '@/lib/money';
-import { resizeImageFile } from '@/lib/image';
 import type { Settings } from '@/domain/types';
 
 const TABS = [
   { key: 'business', label: 'ব্যবসা' },
+  { key: 'branding', label: 'ব্র্যান্ডিং' },
   { key: 'preferences', label: 'ভাষা ও সংখ্যা' },
   { key: 'numbering', label: 'নম্বর ও ইনভয়েস' },
   { key: 'categories', label: 'ক্যাটেগরি' },
@@ -81,6 +84,7 @@ export default function SettingsPage() {
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
 
       {tab === 'business' && <BusinessSection form={form} onChange={setForm} onSave={save} busy={busy} />}
+      {tab === 'branding' && <BrandingSection form={form} onChange={setForm} onSave={save} busy={busy} />}
       {tab === 'preferences' && <PreferencesSection form={form} onChange={setForm} onSave={save} busy={busy} />}
       {tab === 'numbering' && <NumberingSection form={form} onChange={setForm} onSave={save} busy={busy} />}
       {tab === 'categories' && <CategoriesSection />}
@@ -111,7 +115,6 @@ function SectionActions({ onSave, busy, disabled }: { onSave: () => void; busy: 
 /* ------------------------------------------------------------------ */
 
 function BusinessSection({ form, onChange, onSave, busy }: { form: Settings; onChange: (value: Settings) => void; onSave: SaveFn; busy: boolean }) {
-  const [localError, setLocalError] = useState<string | null>(null);
   const business = form.business;
   const patch = (next: Partial<Settings['business']>) => onChange({ ...form, business: { ...business, ...next } });
 
@@ -119,58 +122,220 @@ function BusinessSection({ form, onChange, onSave, busy }: { form: Settings; onC
     <Card>
       <CardHeader title="ব্যবসার তথ্য" subtitle="ইনভয়েস ও রিপোর্টে ব্যবহার হবে" />
       <CardBody className="grid gap-3 sm:grid-cols-2">
-        {localError && <div className="sm:col-span-2"><ErrorBanner message={localError} /></div>}
         <Field label="ব্যবসার নাম" required className="sm:col-span-2">
           {({ id }) => <Input id={id} value={business.name} onChange={(e) => patch({ name: e.target.value })} />}
         </Field>
-        <Field label="ফোন">
+        <Field label="মালিক/প্রোপ্রাইটরের নাম" hint="ইনভয়েসের স্বাক্ষরের নিচে দেখা যায়">
+          {({ id }) => <Input id={id} value={business.ownerName} onChange={(e) => patch({ ownerName: e.target.value })} />}
+        </Field>
+        <Field label="প্রধান ফোন">
           {({ id }) => <Input id={id} value={business.phone} onChange={(e) => patch({ phone: e.target.value })} dir="ltr" inputMode="tel" />}
+        </Field>
+        <Field label="দ্বিতীয় ফোন" hint="ঐচ্ছিক">
+          {({ id }) => <Input id={id} value={business.altPhone} onChange={(e) => patch({ altPhone: e.target.value })} dir="ltr" inputMode="tel" />}
         </Field>
         <Field label="ইমেইল">
           {({ id }) => <Input id={id} value={business.email} onChange={(e) => patch({ email: e.target.value })} type="email" dir="ltr" />}
         </Field>
-        <Field label="ওয়েবসাইট/পেজ">
+        <Field label="ওয়েবসাইট/সোশ্যাল মিডিয়া" hint="ঐচ্ছিক — ফেসবুক পেজ বা ওয়েবসাইটের লিংক">
           {({ id }) => <Input id={id} value={business.website} onChange={(e) => patch({ website: e.target.value })} dir="ltr" />}
         </Field>
         <Field label="ট্রেড লাইসেন্স/টিআইএন">
           {({ id }) => <Input id={id} value={business.registrationNote} onChange={(e) => patch({ registrationNote: e.target.value })} />}
         </Field>
+        <Field label="এলাকা/থানা">
+          {({ id }) => <Input id={id} value={business.area} onChange={(e) => patch({ area: e.target.value })} />}
+        </Field>
+        <Field label="জেলা">
+          {({ id }) => <Input id={id} value={business.district} onChange={(e) => patch({ district: e.target.value })} />}
+        </Field>
         <Field label="ঠিকানা" className="sm:col-span-2">
           {({ id }) => <Textarea id={id} value={business.address} onChange={(e) => patch({ address: e.target.value })} />}
         </Field>
-        <Field label="লোগো" className="sm:col-span-2" hint="২০০-৩০০ পিক্সেলের ছবি যথেষ্ট">
+        <Field label="ব্যবসার পরিচিতি" className="sm:col-span-2" hint="ইনভয়েসে দেখাতে চাইলে ব্র্যান্ডিং ট্যাবে চালু করুন">
+          {({ id }) => <Textarea id={id} value={business.description} onChange={(e) => patch({ description: e.target.value })} />}
+        </Field>
+        <Field label="কাস্টম ফুটার / ধন্যবাদ বার্তা" className="sm:col-span-2" hint="ইনভয়েসের নিচে ছাপা হবে">
           {({ id }) => (
-            <div className="flex items-center gap-3">
-              {business.logoDataUrl && <img src={business.logoDataUrl} alt="লোগো" className="h-16 w-16 rounded-lg border border-ink-200 object-contain" />}
-              <input
-                id={id}
-                type="file"
-                accept="image/*"
-                className="block w-full text-sm"
-                onChange={async (event) => {
-                  const file = event.target.files?.[0];
-                  if (!file) return;
-                  try {
-                    patch({ logoDataUrl: await resizeImageFile(file, 240) });
-                    setLocalError(null);
-                  } catch (err) {
-                    setLocalError(err instanceof Error ? err.message : String(err));
-                  }
-                }}
-              />
-            </div>
+            <Textarea
+              id={id}
+              value={business.thankYouMessage}
+              onChange={(e) => patch({ thankYouMessage: e.target.value })}
+              placeholder="আমাদের সাথে কেনাকাটার জন্য ধন্যবাদ।"
+            />
           )}
         </Field>
-        {business.logoDataUrl && (
-          <div className="sm:col-span-2">
-            <Button variant="ghost" size="sm" icon="trash" onClick={() => patch({ logoDataUrl: null })}>
-              লোগো সরিয়ে দিন
-            </Button>
-          </div>
-        )}
+        <div className="sm:col-span-2">
+          <LogoUploadField
+            value={business.logoDataUrl}
+            businessName={business.name}
+            onChange={(logoDataUrl) => patch({ logoDataUrl })}
+          />
+        </div>
       </CardBody>
       <SectionActions onSave={() => onSave({ business })} busy={busy} />
     </Card>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Branding (V2)                                                       */
+/* ------------------------------------------------------------------ */
+
+const SURFACE_LABELS: Array<{ key: keyof Settings['branding']['showLogoOn']; label: string }> = [
+  { key: 'invoice', label: 'ইনভয়েস' },
+  { key: 'courierSlip', label: 'কুরিয়ার স্লিপ' },
+  { key: 'parcelLabel', label: 'পার্সেল লেবেল' },
+  { key: 'reports', label: 'রিপোর্ট' },
+];
+
+function BrandingSection({ form, onChange, onSave, busy }: { form: Settings; onChange: (value: Settings) => void; onSave: SaveFn; busy: boolean }) {
+  const branding = form.branding;
+  const business = form.business;
+  const patch = (next: Partial<Settings['branding']>) => onChange({ ...form, branding: { ...branding, ...next } });
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader
+          title="ব্র্যান্ডিং"
+          subtitle="ইনভয়েস, কুরিয়ার স্লিপ, পার্সেল লেবেল ও রিপোর্টে আপনার ব্যবসার পরিচয় কীভাবে দেখাবে"
+        />
+        <CardBody className="grid gap-3 sm:grid-cols-2">
+          <Field label="ট্যাগলাইন" hint="ব্যবসার নামের নিচে ছোট একটি লাইন">
+            {({ id }) => (
+              <Input
+                id={id}
+                value={branding.tagline}
+                onChange={(e) => patch({ tagline: e.target.value })}
+                placeholder="যেমন: নারীদের পোশাকে ১০ বছরের অভিজ্ঞতা"
+              />
+            )}
+          </Field>
+          <Field label="ডকুমেন্ট ফুটার" hint="রিপোর্ট ও অন্যান্য ডকুমেন্টের নিচে">
+            {({ id }) => (
+              <Input
+                id={id}
+                value={branding.documentFooter}
+                onChange={(e) => patch({ documentFooter: e.target.value })}
+              />
+            )}
+          </Field>
+
+          <Field label="রঙের থিম">
+            {({ id }) => (
+              <Select
+                id={id}
+                value={branding.accent}
+                onChange={(e) => patch({ accent: e.target.value as Settings['branding']['accent'] })}
+                options={ACCENT_PRESETS.map((preset) => ({ value: preset.value, label: preset.label }))}
+              />
+            )}
+          </Field>
+          <Field label="লেখার আকার">
+            {({ id }) => (
+              <Select
+                id={id}
+                value={branding.fontScale}
+                onChange={(e) => patch({ fontScale: e.target.value as Settings['branding']['fontScale'] })}
+                options={(Object.keys(FONT_SCALE_LABEL) as Array<Settings['branding']['fontScale']>).map((key) => ({
+                  value: key,
+                  label: FONT_SCALE_LABEL[key],
+                }))}
+              />
+            )}
+          </Field>
+          <Field label="লেখার বিন্যাস">
+            {({ id }) => (
+              <Select
+                id={id}
+                value={branding.align}
+                onChange={(e) => patch({ align: e.target.value as Settings['branding']['align'] })}
+                options={(Object.keys(ALIGN_LABEL) as Array<Settings['branding']['align']>).map((key) => ({
+                  value: key,
+                  label: ALIGN_LABEL[key],
+                }))}
+              />
+            )}
+          </Field>
+          <Field label="ব্যবসার পরিচিতি দেখান" hint="ইনভয়েসে ব্যবসার বিবরণ ছাপা হবে">
+            {({ id }) => (
+              <Checkbox
+                id={id}
+                checked={branding.showBusinessDescription}
+                onChange={(e) => patch({ showBusinessDescription: e.target.checked })}
+                label="বিবরণ দেখান"
+              />
+            )}
+          </Field>
+
+          <div className="sm:col-span-2">
+            <p className="mb-1.5 text-sm font-medium text-ink-700">লোগো কোথায় দেখাবে</p>
+            <div className="flex flex-wrap gap-2">
+              {SURFACE_LABELS.map((surface) => (
+                <Checkbox
+                  key={surface.key}
+                  id={`logo-${surface.key}`}
+                  label={surface.label}
+                  checked={branding.showLogoOn[surface.key]}
+                  onChange={(e) => patch({ showLogoOn: { ...branding.showLogoOn, [surface.key]: e.target.checked } })}
+                />
+              ))}
+            </div>
+          </div>
+        </CardBody>
+        <SectionActions onSave={() => onSave({ branding, business })} busy={busy} />
+      </Card>
+
+      <Card>
+        <CardHeader title="স্বাক্ষর" subtitle="ইনভয়েস ও ডকুমেন্টের নিচে" />
+        <CardBody className="grid gap-3 sm:grid-cols-2">
+          <Field label="স্বাক্ষর দেখান">
+            {({ id }) => (
+              <Checkbox
+                id={id}
+                checked={branding.showSignature}
+                onChange={(e) => patch({ showSignature: e.target.checked })}
+                label="স্বাক্ষরের ঘর দেখান"
+              />
+            )}
+          </Field>
+          <Field label="স্বাক্ষরের নিচের লেখা">
+            {({ id }) => (
+              <Input
+                id={id}
+                value={branding.signatureLabel}
+                onChange={(e) => patch({ signatureLabel: e.target.value })}
+              />
+            )}
+          </Field>
+          <Field label="স্বাক্ষরকারীর নাম" hint="খালি রাখলে ব্যবসার মালিকের নাম ব্যবহার হবে">
+            {({ id }) => (
+              <Input
+                id={id}
+                value={branding.signatureName}
+                onChange={(e) => patch({ signatureName: e.target.value })}
+                placeholder={business.ownerName || 'মালিকের নাম'}
+              />
+            )}
+          </Field>
+        </CardBody>
+        <SectionActions onSave={() => onSave({ branding, business })} busy={busy} />
+      </Card>
+
+      <Card>
+        <CardHeader title="প্রিভিউ" subtitle="ইনভয়েসে এই পরিচয়টি দেখাবে" />
+        <CardBody>
+          <div className="rounded-lg border border-ink-200 bg-white p-4">
+            <BrandingBlock
+              settings={form}
+              surface="invoice"
+              meta={<p className="text-xs text-ink-500">ইনভয়েস নং: INV-00001</p>}
+            />
+          </div>
+        </CardBody>
+      </Card>
+    </div>
   );
 }
 
@@ -815,6 +980,27 @@ function AboutSection() {
           </p>
           <p className="text-xs text-ink-500">
             একই ডিভাইসে ব্রাউজার ব্যবহার করতে পারা অন্য কেউ এই তথ্য দেখতে পারে। পিন লক শুধু স্ক্রিন ঢেকে রাখে; এটি কোনো এনক্রিপশন নয়।
+          </p>
+        </CardBody>
+      </Card>
+
+      <Card>
+        <CardHeader
+          title="নির্মাতা"
+          subtitle="সফটওয়্যারটি কে বানিয়েছেন — কাস্টমার-মুখী কোনো ডকুমেন্টে এটি দেখা যায় না"
+        />
+        <CardBody className="space-y-1 text-sm">
+          <p className="font-semibold text-ink-900">{SOFTWARE_DEVELOPER.name}</p>
+          <p className="text-ink-600">{SOFTWARE_DEVELOPER.role}</p>
+          <p className="text-ink-600" dir="ltr">
+            <a href={`mailto:${SOFTWARE_DEVELOPER.email}`} className="text-brand-700 underline">
+              {SOFTWARE_DEVELOPER.email}
+            </a>
+          </p>
+          <p className="mt-2 text-xs text-ink-500">
+            এই তথ্য শুধু এই পেজেই থাকে। আপনার ইনভয়েস, রিপোর্ট, কুরিয়ার স্লিপ বা পার্সেল
+            লেবেলে কখনোই নির্মাতার নাম বা ঠিকানা বসানো হয় না — সেখানে শুধু আপনার ব্যবসার
+            পরিচয় থাকে, যা আপনি সেটিংসের “ব্যবসা” ও “ব্র্যান্ডিং” ট্যাবে নিজেই ঠিক করেন।
           </p>
         </CardBody>
       </Card>

@@ -22,7 +22,36 @@ export async function getSettings(): Promise<Settings> {
   return ensureSettings(APP_VERSION);
 }
 
-export async function updateSettings(patch: Partial<Omit<Settings, 'id'>>): Promise<Settings> {
+/**
+ * The keys a caller may patch.
+ *
+ * `Settings` carries a `Record<string, unknown>` index signature, which makes
+ * `Partial<Omit<Settings, 'id'>>` degenerate into "any object at all" — a caller could
+ * silently write a half-built `business` block and TypeScript would not notice. Listing
+ * the keys keeps the brand-critical blocks honest.
+ */
+export type SettingsPatch = Partial<
+  Pick<
+    Settings,
+    | 'schemaVersion'
+    | 'appVersion'
+    | 'onboardingCompleted'
+    | 'business'
+    | 'currency'
+    | 'locale'
+    | 'invoice'
+    | 'order'
+    | 'inventory'
+    | 'security'
+    | 'backup'
+    | 'branding'
+    | 'documents'
+    | 'promotions'
+    | 'dashboard'
+  >
+>;
+
+export async function updateSettings(patch: SettingsPatch): Promise<Settings> {
   const current = await getSettings();
   const next: Settings = { ...current, ...patch, id: 'app', updatedAt: nowMs() };
   await db.settings.put(next);

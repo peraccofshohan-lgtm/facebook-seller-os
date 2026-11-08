@@ -4,6 +4,11 @@
  */
 
 export const MAX_IMAGE_EDGE = 320;
+/** Business logos are printed, so they get a little more resolution than a product photo. */
+export const MAX_LOGO_EDGE = 512;
+/** Formats the browser is guaranteed to encode back to a data URL. */
+export const ALLOWED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml'] as const;
+export const MAX_LOGO_BYTES = 4 * 1024 * 1024;
 
 export async function resizeImageFile(file: File, maxEdge = MAX_IMAGE_EDGE, quality = 0.82): Promise<string> {
   if (!file.type.startsWith('image/')) throw new Error('শুধু ছবির ফাইল নির্বাচন করুন');
@@ -35,6 +40,15 @@ function readAsDataUrl(file: File): Promise<string> {
   });
 }
 
+function readAsText(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(new Error('ফাইল পড়া যায়নি'));
+    reader.readAsText(file);
+  });
+}
+
 function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const image = new Image();
@@ -42,4 +56,35 @@ function loadImage(src: string): Promise<HTMLImageElement> {
     image.onerror = () => reject(new Error('ছবি খোলা যায়নি'));
     image.src = src;
   });
+}
+
+
+/**
+ * Validate and downscale a business logo.
+ *
+ * SVG is passed through untouched (rasterising it would destroy the sharpness that makes
+ * it useful on a printed invoice), everything else is decoded and re-encoded through a
+ * canvas so an oversized photo cannot bloat the local database.
+ */
+export async function processLogoFile(file: File): Promise<string> {
+  if (!(ALLOWED_IMAGE_TYPES as readonly string[]).includes(file.type)) {
+    throw new Error('লোগো PNG, JPG, WebP বা SVG ফরম্যাটে দিন');
+  }
+  if (file.size > MAX_LOGO_BYTES) {
+    throw new Error('লোগোটি ৪ মেগাবাইটের বেশি বড় — ছোট ফাইল ব্যবহার করুন');
+  }
+
+  if (file.type === 'image/svg+xml') {
+    // FileReader rather than Blob.text(): it is supported everywhere the app runs.
+    const text = await readAsText(file);
+    if (text.length > 512 * 1024) throw new Error('SVG লোগোটি খুব বড়');
+    // Reject anything that could execute: a logo is data, never markup with behaviour.
+    const lowered = text.toLowerCase();
+    if (lowered.includes('<script') || lowered.includes('onload=') || lowered.includes('onerror=')) {
+      throw new Error('এই SVG ফাইলটি নিরাপদ নয় — অন্য লোগো ব্যবহার করুন');
+    }
+    return `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(text)))}`;
+  }
+
+  return resizeImageFile(file, MAX_LOGO_EDGE, 0.9);
 }

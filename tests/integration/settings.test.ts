@@ -16,7 +16,7 @@ describe('settings', () => {
   });
 
   it('merges a partial update without wiping other sections', async () => {
-    await updateSettings({ business: { name: 'রিমা কালেকশন' } as never });
+    await updateSettings({ business: { ...(await getSettings()).business, name: 'রিমা কালেকশন' } });
     const settings = await getSettings();
     expect(settings.business.name).toBe('রিমা কালেকশন');
     // Untouched sections keep their defaults.
@@ -56,7 +56,7 @@ describe('settings', () => {
   });
 
   it('resetSettings restores factory defaults', async () => {
-    await updateSettings({ business: { name: 'পরিবর্তিত' } as never });
+    await updateSettings({ business: { ...(await getSettings()).business, name: 'পরিবর্তিত' } });
     const reset = await resetSettings();
     expect(reset.business.name).toBe('');
     expect(reset.order.prefix).toBe('ORD');
