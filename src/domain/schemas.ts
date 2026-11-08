@@ -9,7 +9,7 @@
  */
 
 import { z } from 'zod';
-import { assertMinor, parseMoney } from '@/lib/money';
+import { assertMinor, parseMoney, toLatinDigits } from '@/lib/money';
 import { fromDateInputValue } from '@/lib/date';
 import { isValidBdPhone, normalizePhone } from '@/lib/search';
 
@@ -30,6 +30,11 @@ import { isValidBdPhone, normalizePhone } from '@/lib/search';
 const moneyField = z
   .union([z.string(), z.number()])
   .transform((v, ctx) => {
+    // "abc" would otherwise be stripped to "" and silently read as zero.
+    if (typeof v === 'string' && v.trim() !== '' && !/\d/.test(toLatinDigits(v))) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'সঠিক টাকার অঙ্ক দিন' });
+      return z.NEVER;
+    }
     try {
       const minor = typeof v === 'number' ? assertMinor(v) : parseMoney(v);
       if (!Number.isSafeInteger(minor)) throw new Error('overflow');

@@ -64,6 +64,13 @@ describe('money fields in the schemas', () => {
     expect(result.success).toBe(false);
   });
 
+  it('rejects text that contains no number instead of quietly reading it as zero', () => {
+    expect(productInputSchema.safeParse({ ...base, costPrice: 'abc' }).success).toBe(false);
+    expect(productInputSchema.safeParse({ ...base, costPrice: '-' }).success).toBe(false);
+    // Empty really does mean zero.
+    expect(productInputSchema.parse({ ...base, costPrice: '' }).costPrice).toBe(0);
+  });
+
   it('keeps a numeric discount price in paisa but allows null', () => {
     expect(productInputSchema.parse({ ...base, discountPrice: 5000 }).discountPrice).toBe(5000);
     expect(productInputSchema.parse({ ...base, discountPrice: null }).discountPrice).toBeNull();
